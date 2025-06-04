@@ -19,6 +19,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
@@ -291,7 +292,7 @@ func (c *ControllerBuilder) Start(ctx context.Context) error {
 	}
 
 	setupLog.Info("creating base gateway controller")
-	if err := NewBaseGatewayController(ctx, gwCfg); err != nil {
+	if err := NewBaseGatewayController[*v1alpha1.GatewayParameters](ctx, gwCfg); err != nil {
 		setupLog.Error(err, "unable to create gateway controller")
 		return err
 	}
@@ -309,7 +310,7 @@ func (c *ControllerBuilder) Start(ctx context.Context) error {
 		if globalSettings.InferExtAutoProvision {
 			poolCfg.InferenceExt = new(deployer.InferenceExtInfo)
 		}
-		if err := NewBaseInferencePoolController(ctx, poolCfg, &gwCfg); err != nil {
+		if err := NewBaseInferencePoolController[*v1alpha1.GatewayParameters](ctx, poolCfg, &gwCfg); err != nil {
 			setupLog.Error(err, "unable to create inferencepool controller")
 			return err
 		}

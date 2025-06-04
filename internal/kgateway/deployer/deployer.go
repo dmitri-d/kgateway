@@ -52,7 +52,7 @@ type Deployer struct {
 	cli   client.Client
 
 	inputs     *Inputs
-	helmValues HelmValues
+	helmValues HelmValuesGenerator
 }
 
 type ControlPlaneInfo struct {
@@ -83,7 +83,7 @@ type ImageInfo struct {
 // NewDeployer creates a new gateway deployer.
 // TODO [danehans]: Reloading the chart for every reconciliation is inefficient.
 // See https://github.com/kgateway-dev/kgateway/issues/10672 for details.
-func NewDeployer(cli client.Client, inputs *Inputs) (*Deployer, error) {
+func NewDeployer(cli client.Client, inputs *Inputs, hvg HelmValuesGenerator) (*Deployer, error) {
 	if inputs == nil {
 		return nil, NilDeployerInputsErr
 	}
@@ -112,7 +112,7 @@ func NewDeployer(cli client.Client, inputs *Inputs) (*Deployer, error) {
 		cli:        cli,
 		chart:      helmChart,
 		inputs:     inputs,
-		helmValues: &kGatewayHelmValues{cli: cli, inputs: inputs},
+		helmValues: hvg,
 	}, nil
 }
 

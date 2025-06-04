@@ -81,13 +81,14 @@ func NewBaseGatewayController(ctx context.Context, cfg GatewayConfig) error {
 	log := log.FromContext(ctx)
 	log.V(5).Info("starting gateway controller", "controllerName", cfg.ControllerName)
 
-	controllerBuilder := &controllerBuilder[*v1alpha1.GatewayParameters]{
+	controllerBuilder := &controllerBuilder{
 		cfg: cfg,
 		reconciler: &controllerReconciler{
 			cli:          cfg.Mgr.GetClient(),
 			scheme:       cfg.Mgr.GetScheme(),
 			customEvents: make(chan event.TypedGenericEvent[ir.Gateway], 1024),
 		},
+		helmValueGenerators: map[client.Object]deployer.HelmValuesGenerator{&v1alpha1.GatewayParameters{}: nil},
 	}
 
 	return run(
@@ -104,12 +105,12 @@ type InferencePoolConfig struct {
 	InferenceExt   *deployer.InferenceExtInfo
 }
 
-func NewBaseInferencePoolController[T client.Object](ctx context.Context, poolCfg *InferencePoolConfig, gwCfg *GatewayConfig) error {
+func NewBaseInferencePoolController(ctx context.Context, poolCfg *InferencePoolConfig, gwCfg *GatewayConfig) error {
 	log := log.FromContext(ctx)
 	log.V(5).Info("starting inferencepool controller", "controllerName", poolCfg.ControllerName)
 
 	// TODO [danehans]: Make GatewayConfig optional since Gateway and InferencePool are independent controllers.
-	controllerBuilder := &controllerBuilder[T]{
+	controllerBuilder := &controllerBuilder{
 		cfg:     *gwCfg,
 		poolCfg: poolCfg,
 		reconciler: &controllerReconciler{
@@ -117,6 +118,7 @@ func NewBaseInferencePoolController[T client.Object](ctx context.Context, poolCf
 			scheme:       poolCfg.Mgr.GetScheme(),
 			customEvents: make(chan event.TypedGenericEvent[ir.Gateway], 1024),
 		},
+		helmValueGenerators: map[client.Object]deployer.HelmValuesGenerator{&v1alpha1.GatewayParameters{}: nil},
 	}
 
 	return run(ctx, controllerBuilder.watchInferencePool)
@@ -131,13 +133,14 @@ func run(ctx context.Context, funcs ...func(ctx context.Context) error) error {
 	return nil
 }
 
-type controllerBuilder[T client.Object] struct {
-	cfg        GatewayConfig
-	poolCfg    *InferencePoolConfig
-	reconciler *controllerReconciler
+type controllerBuilder struct {
+	cfg                 GatewayConfig
+	poolCfg             *InferencePoolConfig
+	reconciler          *controllerReconciler
+	helmValueGenerators map[client.Object]deployer.HelmValuesGenerator
 }
 
-func (c *controllerBuilder[T]) addIndexes(ctx context.Context) error {
+func (c *controllerBuilder) addIndexes(ctx context.Context) error {
 	if err := c.cfg.Mgr.GetFieldIndexer().IndexField(ctx, &apiv1.Gateway{}, GatewayParamsField, gatewayToParams); err != nil {
 		return err
 	}
@@ -171,19 +174,22 @@ func gatewayToClass(obj client.Object) []string {
 	return []string{string(gw.Spec.GatewayClassName)}
 }
 
-func (c *controllerBuilder[T]) watchGw(ctx context.Context) error {
+func (c *controllerBuilder) watchGw(ctx context.Context) error {
 	// setup a deployer
 	log := log.FromContext(ctx)
 
 	log.Info("creating gateway deployer", "ctrlname", c.cfg.ControllerName, "server", c.cfg.ControlPlane.XdsHost, "port", c.cfg.ControlPlane.XdsPort)
-	d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), &deployer.Inputs{
+	inputs := &deployer.Inputs{
 		ControllerName:       c.cfg.ControllerName,
 		Dev:                  c.cfg.Dev,
 		IstioAutoMtlsEnabled: c.cfg.IstioAutoMtlsEnabled,
 		ControlPlane:         c.cfg.ControlPlane,
 		ImageInfo:            c.cfg.ImageInfo,
 		CommonCollections:    c.cfg.CommonCollections,
-	})
+	}
+	helmValuesGenerator := deployer.NewGatewayHelmValuesGenerator(c.cfg.Mgr.GetClient(), inputs).
+		WithAdditionalHVGenerators(c.helmValueGenerators)
+	d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, helmValuesGenerator)
 	if err != nil {
 		return err
 	}
@@ -212,29 +218,30 @@ func (c *controllerBuilder[T]) watchGw(ctx context.Context) error {
 
 	// watch for changes in GatewayParameters and enqueue Gateways that use them
 	cli := c.cfg.Mgr.GetClient()
-	gwparams := new(T)
-	buildr.Watches(*gwparams, handler.EnqueueRequestsFromMapFunc(
-		func(ctx context.Context, obj client.Object) []reconcile.Request {
-			gwpName := obj.GetName()
-			gwpNamespace := obj.GetNamespace()
-			// look up the Gateways that are using this GatewayParameters object
-			var gwList apiv1.GatewayList
-			err := cli.List(ctx, &gwList, client.InNamespace(gwpNamespace), client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(GatewayParamsField, gwpName)})
-			if err != nil {
-				log.Error(err, "could not list Gateways using GatewayParameters", "gwpNamespace", gwpNamespace, "gwpName", gwpName)
-				return []reconcile.Request{}
-			}
-			// requeue each Gateway that is using this GatewayParameters object
-			reqs := make([]reconcile.Request, 0, len(gwList.Items))
-			for _, gw := range gwList.Items {
-				reqs = append(reqs, reconcile.Request{
-					NamespacedName: client.ObjectKeyFromObject(&gw),
-				})
-			}
-			return reqs
-		}),
-		builder.WithPredicates(discoveryNamespaceFilterPredicate),
-	)
+	for gp := range c.helmValueGenerators {
+		buildr.Watches(gp, handler.EnqueueRequestsFromMapFunc(
+			func(ctx context.Context, obj client.Object) []reconcile.Request {
+				gwpName := obj.GetName()
+				gwpNamespace := obj.GetNamespace()
+				// look up the Gateways that are using this GatewayParameters object
+				var gwList apiv1.GatewayList
+				err := cli.List(ctx, &gwList, client.InNamespace(gwpNamespace), client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(GatewayParamsField, gwpName)})
+				if err != nil {
+					log.Error(err, "could not list Gateways using GatewayParameters", "gwpNamespace", gwpNamespace, "gwpName", gwpName)
+					return []reconcile.Request{}
+				}
+				// requeue each Gateway that is using this GatewayParameters object
+				reqs := make([]reconcile.Request, 0, len(gwList.Items))
+				for _, gw := range gwList.Items {
+					reqs = append(reqs, reconcile.Request{
+						NamespacedName: client.ObjectKeyFromObject(&gw),
+					})
+				}
+				return reqs
+			}),
+			builder.WithPredicates(discoveryNamespaceFilterPredicate),
+		)
+	}
 
 	// watch for gatewayclasses managed by our controller and enqueue related gateways
 	buildr.Watches(
@@ -321,7 +328,7 @@ func (c *controllerBuilder[T]) watchGw(ctx context.Context) error {
 	})
 }
 
-func (c *controllerBuilder[T]) addHTTPRouteIndexes(ctx context.Context) error {
+func (c *controllerBuilder) addHTTPRouteIndexes(ctx context.Context) error {
 	return c.cfg.Mgr.GetFieldIndexer().IndexField(ctx, new(apiv1.HTTPRoute), InferencePoolField, httpRouteInferencePoolIndex)
 }
 
@@ -345,7 +352,7 @@ func httpRouteInferencePoolIndex(obj client.Object) []string {
 
 // watchInferencePool adds a watch on InferencePool and HTTPRoute objects (that reference an InferencePool)
 // to trigger reconciliation.
-func (c *controllerBuilder[T]) watchInferencePool(ctx context.Context) error {
+func (c *controllerBuilder) watchInferencePool(ctx context.Context) error {
 	log := log.FromContext(ctx)
 	log.Info("creating inference extension deployer", "controller", c.cfg.ControllerName)
 
@@ -409,12 +416,15 @@ func (c *controllerBuilder[T]) watchInferencePool(ctx context.Context) error {
 
 	// If enabled, create a deployer using the controllerBuilder as inputs.
 	if c.poolCfg.InferenceExt != nil {
-		d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), &deployer.Inputs{
+		inputs := &deployer.Inputs{
 			ControllerName:     c.cfg.ControllerName,
 			ImageInfo:          c.cfg.ImageInfo,
 			InferenceExtension: c.poolCfg.InferenceExt,
 			CommonCollections:  c.cfg.CommonCollections,
-		})
+		}
+		helmValuesGenerator := deployer.NewGatewayHelmValuesGenerator(c.cfg.Mgr.GetClient(), inputs).
+			WithAdditionalHVGenerators(c.helmValueGenerators)
+		d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, helmValuesGenerator)
 		if err != nil {
 			return err
 		}
@@ -457,7 +467,7 @@ func shouldIgnoreStatusChild(gvk schema.GroupVersionKind) bool {
 	return gvk.Kind == "Deployment"
 }
 
-func (c *controllerBuilder[T]) watchGwClass(_ context.Context) error {
+func (c *controllerBuilder) watchGwClass(_ context.Context) error {
 	return ctrl.NewControllerManagedBy(c.cfg.Mgr).
 		For(&apiv1.GatewayClass{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc:  func(e event.CreateEvent) bool { return true },

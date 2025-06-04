@@ -10,37 +10,120 @@ import (
 	"istio.io/api/annotation"
 	"istio.io/api/label"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	api "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-type HelmValues interface {
+type HelmValuesGenerator interface {
 	GetValues(ctx context.Context, gw *api.Gateway) (*helmConfig, error)
 }
 
-type kGatewayHelmValues struct {
+func NewGatewayHelmValuesGenerator(cli client.Client, inputs *Inputs) *GatewayHelmValuesGenerator {
+	return &GatewayHelmValuesGenerator{
+		cli: cli,
+		defaultGatewayHelmValuesGenerator: &kGatewayHelmValuesGenerator{
+			cli:    cli,
+			inputs: inputs,
+		},
+		otherHelmValuesGenerators: make(map[schema.GroupKind]HelmValuesGenerator),
+	}
+}
+
+type GatewayHelmValuesGenerator struct {
+	cli                               client.Client
+	otherHelmValuesGenerators         map[schema.GroupKind]HelmValuesGenerator
+	defaultGatewayHelmValuesGenerator *kGatewayHelmValuesGenerator
+}
+
+type kGatewayHelmValuesGenerator struct {
 	cli    client.Client
 	inputs *Inputs
 }
 
-func (h *kGatewayHelmValues) GetValues(ctx context.Context, gw *api.Gateway) (*helmConfig, error) {
+func (gv *GatewayHelmValuesGenerator) WithAdditionalHVGenerators(og map[client.Object]HelmValuesGenerator) *GatewayHelmValuesGenerator {
+	for o, g := range og {
+		group := o.GetObjectKind().GroupVersionKind().Group
+		kind := o.GetObjectKind().GroupVersionKind().Kind
+		// kGateway GatewayParameters are handled by default
+		if group == wellknown.GatewayParametersGVK.Group && kind == wellknown.GatewayParametersGVK.Kind {
+			continue
+		}
+		gv.otherHelmValuesGenerators[schema.GroupKind{Group: group, Kind: kind}] = g
+	}
+	return gv
+}
+
+func (gv *GatewayHelmValuesGenerator) GetValues(ctx context.Context, gw *api.Gateway) (*helmConfig, error) {
+	logger := log.FromContext(ctx)
+
+	ref, err := gv.getGatewayParametersRef(ctx, gw)
+	if err != nil {
+		return nil, err
+	}
+
+	if g, ok := gv.otherHelmValuesGenerators[ref]; ok {
+		return g.GetValues(ctx, gw)
+	}
+	logger.V(1).Info("using default GatewayParameters for Gateway",
+		"gatewayName", gw.GetName(),
+		"gatewayNamespace", gw.GetNamespace(),
+	)
+
+	return gv.defaultGatewayHelmValuesGenerator.GetValues(ctx, gw)
+}
+
+func (gv *GatewayHelmValuesGenerator) getGatewayParametersRef(ctx context.Context, gw *api.Gateway) (schema.GroupKind, error) {
+	logger := log.FromContext(ctx)
+
+	// attempt to get the GatewayParameters name from the Gateway. If we can't find it,
+	// we'll check for the default GWP for the GatewayClass.
+	if gw.Spec.Infrastructure == nil || gw.Spec.Infrastructure.ParametersRef == nil {
+		logger.V(1).Info("no GatewayParameters found for Gateway, using default",
+			"gatewayName", gw.GetName(),
+			"gatewayNamespace", gw.GetNamespace(),
+		)
+		return gv.getDefaultGatewayParametersRef(ctx, gw)
+	}
+
+	return schema.GroupKind{
+			Group: string(gw.Spec.Infrastructure.ParametersRef.Group),
+			Kind:  string(gw.Spec.Infrastructure.ParametersRef.Kind)},
+		nil
+}
+
+func (gv *GatewayHelmValuesGenerator) getDefaultGatewayParametersRef(ctx context.Context, gw *api.Gateway) (schema.GroupKind, error) {
+	gwc, err := getGatewayClassFromGateway(ctx, gv.cli, gw)
+	if err != nil {
+		return schema.GroupKind{}, err
+	}
+
+	if gwc.Spec.ParametersRef != nil {
+		return schema.GroupKind{
+				Group: string(gwc.Spec.ParametersRef.Group),
+				Kind:  string(gwc.Spec.ParametersRef.Kind)},
+			nil
+	}
+
+	return schema.GroupKind{}, nil
+}
+
+func (h *kGatewayHelmValuesGenerator) GetValues(ctx context.Context, gw *api.Gateway) (*helmConfig, error) {
 	gwParam, err := h.getGatewayParametersForGateway(ctx, gw)
 	if err != nil {
 		return nil, err
 	}
-	// If this is a self-managed Gateway, skip gateway auto provisioning
 	if gwParam != nil && gwParam.Spec.SelfManaged != nil {
 		return nil, nil
 	}
-
-	return h.getValues(gw, nil)
+	return h.getValues(gw, gwParam)
 }
 
 // getGatewayParametersForGateway returns the merged GatewayParameters object resulting from the default GwParams object and
 // the GwParam object specifically associated with the given Gateway (if one exists).
-func (h *kGatewayHelmValues) getGatewayParametersForGateway(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
+func (h *kGatewayHelmValuesGenerator) getGatewayParametersForGateway(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
 	logger := log.FromContext(ctx)
 
 	// attempt to get the GatewayParameters name from the Gateway. If we can't find it,
@@ -80,8 +163,8 @@ func (h *kGatewayHelmValues) getGatewayParametersForGateway(ctx context.Context,
 }
 
 // gets the default GatewayParameters associated with the GatewayClass of the provided Gateway
-func (h *kGatewayHelmValues) getDefaultGatewayParameters(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
-	gwc, err := h.getGatewayClassFromGateway(ctx, gw)
+func (h *kGatewayHelmValuesGenerator) getDefaultGatewayParameters(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
+	gwc, err := getGatewayClassFromGateway(ctx, h.cli, gw)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +172,7 @@ func (h *kGatewayHelmValues) getDefaultGatewayParameters(ctx context.Context, gw
 }
 
 // Gets the GatewayParameters object associated with a given GatewayClass.
-func (h *kGatewayHelmValues) getGatewayParametersForGatewayClass(ctx context.Context, gwc *api.GatewayClass) (*v1alpha1.GatewayParameters, error) {
+func (h *kGatewayHelmValuesGenerator) getGatewayParametersForGatewayClass(ctx context.Context, gwc *api.GatewayClass) (*v1alpha1.GatewayParameters, error) {
 	logger := log.FromContext(ctx)
 
 	defaultGwp := getInMemoryGatewayParameters(gwc.GetName(), h.inputs.ImageInfo)
@@ -133,24 +216,7 @@ func (h *kGatewayHelmValues) getGatewayParametersForGatewayClass(ctx context.Con
 	return mergedGwp, nil
 }
 
-func (h *kGatewayHelmValues) getGatewayClassFromGateway(ctx context.Context, gw *api.Gateway) (*api.GatewayClass, error) {
-	if gw == nil {
-		return nil, eris.New("nil Gateway")
-	}
-	if gw.Spec.GatewayClassName == "" {
-		return nil, eris.New("GatewayClassName must not be empty")
-	}
-
-	gwc := &api.GatewayClass{}
-	err := h.cli.Get(ctx, client.ObjectKey{Name: string(gw.Spec.GatewayClassName)}, gwc)
-	if err != nil {
-		return nil, eris.Errorf("failed to get GatewayClass for Gateway %s/%s", gw.GetName(), gw.GetNamespace())
-	}
-
-	return gwc, nil
-}
-
-func (d *kGatewayHelmValues) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameters) (*helmConfig, error) {
+func (d *kGatewayHelmValuesGenerator) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameters) (*helmConfig, error) {
 	gwKey := ir.ObjectSource{
 		Group:     wellknown.GatewayGVK.GroupKind().Group,
 		Kind:      wellknown.GatewayGVK.GroupKind().Kind,
@@ -259,6 +325,23 @@ func (d *kGatewayHelmValues) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 	gateway.Stats = getStatsValues(statsConfig)
 
 	return vals, nil
+}
+
+func getGatewayClassFromGateway(ctx context.Context, cli client.Client, gw *api.Gateway) (*api.GatewayClass, error) {
+	if gw == nil {
+		return nil, eris.New("nil Gateway")
+	}
+	if gw.Spec.GatewayClassName == "" {
+		return nil, eris.New("GatewayClassName must not be empty")
+	}
+
+	gwc := &api.GatewayClass{}
+	err := cli.Get(ctx, client.ObjectKey{Name: string(gw.Spec.GatewayClassName)}, gwc)
+	if err != nil {
+		return nil, eris.Errorf("failed to get GatewayClass for Gateway %s/%s", gw.GetName(), gw.GetNamespace())
+	}
+
+	return gwc, nil
 }
 
 // getInMemoryGatewayParameters returns an in-memory GatewayParameters based on the name of the gateway class.
