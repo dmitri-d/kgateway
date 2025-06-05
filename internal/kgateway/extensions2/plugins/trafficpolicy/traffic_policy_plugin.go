@@ -494,7 +494,7 @@ func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, re
 }
 
 func (p *TrafficPolicy) Name() string {
-	return "routepolicies" // TODO: rename to trafficpolicies
+	return "trafficpolicies"
 }
 
 func (p *trafficPolicyPluginGwPass) ApplyRouteConfigPlugin(ctx context.Context, pCtx *ir.RouteConfigContext, out *routev3.RouteConfiguration) {
