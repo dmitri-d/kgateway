@@ -261,7 +261,7 @@ func (d *Deployer) Render(name, ns string, vals map[string]any) ([]client.Object
 func (d *Deployer) GetObjsToDeploy(ctx context.Context, gw *api.Gateway) ([]client.Object, error) {
 	logger := log.FromContext(ctx)
 
-	vals, err := d.helmValues.GetValues(ctx, gw)
+	vals, err := d.helmValues.GetValues(ctx, gw, d.inputs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get values to render objects for gateway %s.%s: %w", gw.GetNamespace(), gw.GetName(), err)
 	}

@@ -13,9 +13,11 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/admin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/controller"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/settings"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
@@ -36,8 +38,15 @@ func WithExtraPlugins(extraPlugins func(ctx context.Context, commoncol *common.C
 	}
 }
 
+func ExtraGatewayParameters(extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters) func(*setup) {
+	return func(s *setup) {
+		s.extraGatewayParameters = extraGatewayParameters
+	}
+}
+
 type setup struct {
-	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
+	extraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters
 }
 
 var _ Server = &setup{}
@@ -51,12 +60,13 @@ func New(opts ...func(*setup)) *setup {
 }
 
 func (s *setup) Start(ctx context.Context) error {
-	return StartKgateway(ctx, s.extraPlugins)
+	return StartKgateway(ctx, s.extraPlugins, s.extraGatewayParameters)
 }
 
 func StartKgateway(
 	ctx context.Context,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters,
 ) error {
 	// load global settings
 	st, err := settings.BuildSettings()
@@ -83,7 +93,7 @@ func StartKgateway(
 	}
 
 	restConfig := ctrl.GetConfigOrDie()
-	return StartKgatewayWithConfig(ctx, setupOpts, restConfig, uccBuilder, extraPlugins)
+	return StartKgatewayWithConfig(ctx, setupOpts, restConfig, uccBuilder, extraPlugins, extraGatewayParameters)
 }
 
 func startControlPlane(
@@ -100,6 +110,7 @@ func StartKgatewayWithConfig(
 	restConfig *rest.Config,
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters,
 ) error {
 	slog.Info("starting kgateway")
 
@@ -122,15 +133,16 @@ func StartKgatewayWithConfig(
 	slog.Info("initializing controller")
 	c, err := controller.NewControllerBuilder(ctx, controller.StartConfig{
 		// TODO: why do we plumb this through if it's wellknown?
-		ControllerName: wellknown.GatewayControllerName,
-		ExtraPlugins:   extraPlugins,
-		RestConfig:     restConfig,
-		SetupOpts:      setupOpts,
-		Client:         kubeClient,
-		AugmentedPods:  augmentedPods,
-		UniqueClients:  ucc,
-		Dev:            logging.MustGetLevel(logging.DefaultComponent) <= logging.LevelTrace,
-		KrtOptions:     krtOpts,
+		ControllerName:         wellknown.GatewayControllerName,
+		ExtraPlugins:           extraPlugins,
+		ExtraGatewayParameters: extraGatewayParameters,
+		RestConfig:             restConfig,
+		SetupOpts:              setupOpts,
+		Client:                 kubeClient,
+		AugmentedPods:          augmentedPods,
+		UniqueClients:          ucc,
+		Dev:                    logging.MustGetLevel(logging.DefaultComponent) <= logging.LevelTrace,
+		KrtOptions:             krtOpts,
 	})
 	if err != nil {
 		slog.Error("failed initializing controller: ", "error", err)

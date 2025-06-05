@@ -25,7 +25,6 @@ import (
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	apiv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
@@ -77,7 +76,7 @@ type GatewayConfig struct {
 	CommonCollections *common.CommonCollections
 }
 
-func NewBaseGatewayController(ctx context.Context, cfg GatewayConfig) error {
+func NewBaseGatewayController(ctx context.Context, cfg GatewayConfig, extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters) error {
 	log := log.FromContext(ctx)
 	log.V(5).Info("starting gateway controller", "controllerName", cfg.ControllerName)
 
@@ -88,7 +87,7 @@ func NewBaseGatewayController(ctx context.Context, cfg GatewayConfig) error {
 			scheme:       cfg.Mgr.GetScheme(),
 			customEvents: make(chan event.TypedGenericEvent[ir.Gateway], 1024),
 		},
-		helmValueGenerators: map[client.Object]deployer.HelmValuesGenerator{&v1alpha1.GatewayParameters{}: nil},
+		extraGatewayParameters: extraGatewayParameters,
 	}
 
 	return run(
@@ -105,7 +104,10 @@ type InferencePoolConfig struct {
 	InferenceExt   *deployer.InferenceExtInfo
 }
 
-func NewBaseInferencePoolController(ctx context.Context, poolCfg *InferencePoolConfig, gwCfg *GatewayConfig) error {
+func NewBaseInferencePoolController(ctx context.Context,
+	poolCfg *InferencePoolConfig,
+	gwCfg *GatewayConfig,
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters) error {
 	log := log.FromContext(ctx)
 	log.V(5).Info("starting inferencepool controller", "controllerName", poolCfg.ControllerName)
 
@@ -118,7 +120,7 @@ func NewBaseInferencePoolController(ctx context.Context, poolCfg *InferencePoolC
 			scheme:       poolCfg.Mgr.GetScheme(),
 			customEvents: make(chan event.TypedGenericEvent[ir.Gateway], 1024),
 		},
-		helmValueGenerators: map[client.Object]deployer.HelmValuesGenerator{&v1alpha1.GatewayParameters{}: nil},
+		extraGatewayParameters: extraGatewayParameters,
 	}
 
 	return run(ctx, controllerBuilder.watchInferencePool)
@@ -134,10 +136,10 @@ func run(ctx context.Context, funcs ...func(ctx context.Context) error) error {
 }
 
 type controllerBuilder struct {
-	cfg                 GatewayConfig
-	poolCfg             *InferencePoolConfig
-	reconciler          *controllerReconciler
-	helmValueGenerators map[client.Object]deployer.HelmValuesGenerator
+	cfg                    GatewayConfig
+	poolCfg                *InferencePoolConfig
+	reconciler             *controllerReconciler
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 }
 
 func (c *controllerBuilder) addIndexes(ctx context.Context) error {
@@ -187,9 +189,11 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 		ImageInfo:            c.cfg.ImageInfo,
 		CommonCollections:    c.cfg.CommonCollections,
 	}
-	helmValuesGenerator := deployer.NewGatewayHelmValuesGenerator(c.cfg.Mgr.GetClient(), inputs).
-		WithAdditionalHVGenerators(c.helmValueGenerators)
-	d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, helmValuesGenerator)
+	gwParams := deployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
+	if c.extraGatewayParameters != nil {
+		gwParams.WithExtraGatewayParameters(c.extraGatewayParameters(c.cfg.Mgr.GetClient(), inputs)...)
+	}
+	d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, gwParams)
 	if err != nil {
 		return err
 	}
@@ -218,7 +222,7 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 
 	// watch for changes in GatewayParameters and enqueue Gateways that use them
 	cli := c.cfg.Mgr.GetClient()
-	for gp := range c.helmValueGenerators {
+	for _, gp := range gwParams.AllKnownGatewayParameters() {
 		buildr.Watches(gp, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, obj client.Object) []reconcile.Request {
 				gwpName := obj.GetName()
@@ -422,9 +426,11 @@ func (c *controllerBuilder) watchInferencePool(ctx context.Context) error {
 			InferenceExtension: c.poolCfg.InferenceExt,
 			CommonCollections:  c.cfg.CommonCollections,
 		}
-		helmValuesGenerator := deployer.NewGatewayHelmValuesGenerator(c.cfg.Mgr.GetClient(), inputs).
-			WithAdditionalHVGenerators(c.helmValueGenerators)
-		d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, helmValuesGenerator)
+		gwParams := deployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
+		if c.extraGatewayParameters != nil {
+			gwParams.WithExtraGatewayParameters(c.extraGatewayParameters(c.cfg.Mgr.GetClient(), inputs)...)
+		}
+		d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, gwParams)
 		if err != nil {
 			return err
 		}
