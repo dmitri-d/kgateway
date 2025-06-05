@@ -38,7 +38,7 @@ func WithExtraPlugins(extraPlugins func(ctx context.Context, commoncol *common.C
 	}
 }
 
-func ExtraGatewayParameters(extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters) func(*setup) {
+func ExtraGatewayParameters(extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters) func(*setup) {
 	return func(s *setup) {
 		s.extraGatewayParameters = extraGatewayParameters
 	}
@@ -46,7 +46,7 @@ func ExtraGatewayParameters(extraGatewayParameters func(cli client.Client, input
 
 type setup struct {
 	extraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 }
 
 var _ Server = &setup{}
@@ -66,7 +66,7 @@ func (s *setup) Start(ctx context.Context) error {
 func StartKgateway(
 	ctx context.Context,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
-	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters,
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 ) error {
 	// load global settings
 	st, err := settings.BuildSettings()
@@ -110,7 +110,7 @@ func StartKgatewayWithConfig(
 	restConfig *rest.Config,
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
-	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters,
+	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 ) error {
 	slog.Info("starting kgateway")
 
