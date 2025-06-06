@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/rotisserie/eris"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -36,16 +35,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 )
 
-var (
-	GetGatewayParametersError = eris.New("could not retrieve GatewayParameters")
-	getGatewayParametersError = func(err error, gwpNamespace, gwpName, gwNamespace, gwName, resourceType string) error {
-		wrapped := eris.Wrap(err, GetGatewayParametersError.Error())
-		return eris.Wrapf(wrapped, "(%s.%s) for %s (%s.%s)",
-			gwpNamespace, gwpName, resourceType, gwNamespace, gwName)
-	}
-	NilDeployerInputsErr = eris.New("nil inputs to NewDeployer")
-)
-
 // A Deployer is responsible for deploying proxies and inference extensions.
 type Deployer struct {
 	chart *chart.Chart
@@ -60,7 +49,7 @@ type Deployer struct {
 // See https://github.com/kgateway-dev/kgateway/issues/10672 for details.
 func NewDeployer(cli client.Client, inputs *deployer.Inputs, hvg deployer.HelmValuesGenerator) (*Deployer, error) {
 	if inputs == nil {
-		return nil, NilDeployerInputsErr
+		return nil, deployer.NilDeployerInputsErr
 	}
 
 	var err error

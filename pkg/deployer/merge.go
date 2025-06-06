@@ -7,6 +7,43 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 )
 
+func DeepMergeGatewayParameters(dst, src *v1alpha1.GatewayParameters) *v1alpha1.GatewayParameters {
+	if src != nil && src.Spec.SelfManaged != nil {
+		// The src override specifies a self-managed gateway, set this on the dst
+		// and skip merging of kube fields that are irrelevant because of using
+		// a self-managed gateway
+		dst.Spec.SelfManaged = src.Spec.SelfManaged
+		dst.Spec.Kube = nil
+		return dst
+	}
+
+	// nil src override means just use dst
+	if src == nil || src.Spec.Kube == nil {
+		return dst
+	}
+
+	if dst == nil || dst.Spec.Kube == nil {
+		return src
+	}
+
+	dstKube := dst.Spec.Kube
+	srcKube := src.Spec.Kube
+
+	dstKube.Deployment = deepMergeDeployment(dstKube.GetDeployment(), srcKube.GetDeployment())
+	dstKube.EnvoyContainer = deepMergeEnvoyContainer(dstKube.GetEnvoyContainer(), srcKube.GetEnvoyContainer())
+	dstKube.SdsContainer = deepMergeSdsContainer(dstKube.GetSdsContainer(), srcKube.GetSdsContainer())
+	dstKube.PodTemplate = deepMergePodTemplate(dstKube.GetPodTemplate(), srcKube.GetPodTemplate())
+	dstKube.Service = deepMergeService(dstKube.GetService(), srcKube.GetService())
+	dstKube.ServiceAccount = deepMergeServiceAccount(dstKube.GetServiceAccount(), srcKube.GetServiceAccount())
+	dstKube.Istio = deepMergeIstioIntegration(dstKube.GetIstio(), srcKube.GetIstio())
+	dstKube.Stats = deepMergeStatsConfig(dstKube.GetStats(), srcKube.GetStats())
+	dstKube.AiExtension = deepMergeAIExtension(dstKube.GetAiExtension(), srcKube.GetAiExtension())
+	dstKube.FloatingUserId = mergePointers(dstKube.GetFloatingUserId(), srcKube.GetFloatingUserId())
+	dstKube.AgentGateway = deepMergeAgentGateway(dstKube.GetAgentGateway(), srcKube.GetAgentGateway())
+
+	return dst
+}
+
 // mergePointers will decide whether to use dst or src without dereferencing or recursing
 func mergePointers[T any](dst, src *T) *T {
 	// nil src override means just use dst
@@ -68,43 +105,6 @@ func mergeComparable[T comparable](dst, src T) T {
 	}
 
 	return src
-}
-
-func deepMergeGatewayParameters(dst, src *v1alpha1.GatewayParameters) *v1alpha1.GatewayParameters {
-	if src != nil && src.Spec.SelfManaged != nil {
-		// The src override specifies a self-managed gateway, set this on the dst
-		// and skip merging of kube fields that are irrelevant because of using
-		// a self-managed gateway
-		dst.Spec.SelfManaged = src.Spec.SelfManaged
-		dst.Spec.Kube = nil
-		return dst
-	}
-
-	// nil src override means just use dst
-	if src == nil || src.Spec.Kube == nil {
-		return dst
-	}
-
-	if dst == nil || dst.Spec.Kube == nil {
-		return src
-	}
-
-	dstKube := dst.Spec.Kube
-	srcKube := src.Spec.Kube
-
-	dstKube.Deployment = deepMergeDeployment(dstKube.GetDeployment(), srcKube.GetDeployment())
-	dstKube.EnvoyContainer = deepMergeEnvoyContainer(dstKube.GetEnvoyContainer(), srcKube.GetEnvoyContainer())
-	dstKube.SdsContainer = deepMergeSdsContainer(dstKube.GetSdsContainer(), srcKube.GetSdsContainer())
-	dstKube.PodTemplate = deepMergePodTemplate(dstKube.GetPodTemplate(), srcKube.GetPodTemplate())
-	dstKube.Service = deepMergeService(dstKube.GetService(), srcKube.GetService())
-	dstKube.ServiceAccount = deepMergeServiceAccount(dstKube.GetServiceAccount(), srcKube.GetServiceAccount())
-	dstKube.Istio = deepMergeIstioIntegration(dstKube.GetIstio(), srcKube.GetIstio())
-	dstKube.Stats = deepMergeStatsConfig(dstKube.GetStats(), srcKube.GetStats())
-	dstKube.AiExtension = deepMergeAIExtension(dstKube.GetAiExtension(), srcKube.GetAiExtension())
-	dstKube.FloatingUserId = mergePointers(dstKube.GetFloatingUserId(), srcKube.GetFloatingUserId())
-	dstKube.AgentGateway = deepMergeAgentGateway(dstKube.GetAgentGateway(), srcKube.GetAgentGateway())
-
-	return dst
 }
 
 func deepMergeStatsConfig(dst *v1alpha1.StatsConfig, src *v1alpha1.StatsConfig) *v1alpha1.StatsConfig {

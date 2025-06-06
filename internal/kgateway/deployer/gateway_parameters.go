@@ -5,11 +5,7 @@ import (
 	"slices"
 
 	"github.com/rotisserie/eris"
-	"istio.io/api/annotation"
-	"istio.io/api/label"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	api "sigs.k8s.io/gateway-api/apis/v1"
@@ -157,7 +153,7 @@ func (h *kGatewayParameters) getGatewayParametersForGateway(ctx context.Context,
 	gwp := &v1alpha1.GatewayParameters{}
 	err := h.cli.Get(ctx, client.ObjectKey{Namespace: gwpNamespace, Name: gwpName}, gwp)
 	if err != nil {
-		return nil, getGatewayParametersError(err, gwpNamespace, gwpName, gw.GetNamespace(), gw.GetName(), "Gateway")
+		return nil, deployer.GetGatewayParametersError(err, gwpNamespace, gwpName, gw.GetNamespace(), gw.GetName(), "Gateway")
 	}
 
 	defaultGwp, err := h.getDefaultGatewayParameters(ctx, gw)
@@ -166,7 +162,7 @@ func (h *kGatewayParameters) getGatewayParametersForGateway(ctx context.Context,
 	}
 
 	mergedGwp := defaultGwp
-	deepMergeGatewayParameters(mergedGwp, gwp)
+	deployer.DeepMergeGatewayParameters(mergedGwp, gwp)
 	return mergedGwp, nil
 }
 
@@ -183,7 +179,7 @@ func (h *kGatewayParameters) getDefaultGatewayParameters(ctx context.Context, gw
 func (h *kGatewayParameters) getGatewayParametersForGatewayClass(ctx context.Context, gwc *api.GatewayClass) (*v1alpha1.GatewayParameters, error) {
 	logger := log.FromContext(ctx)
 
-	defaultGwp := getInMemoryGatewayParameters(gwc.GetName(), h.inputs.ImageInfo)
+	defaultGwp := deployer.GetInMemoryGatewayParameters(gwc.GetName(), h.inputs.ImageInfo)
 	paramRef := gwc.Spec.ParametersRef
 	if paramRef == nil {
 		// when there is no parametersRef, just return the defaults
@@ -208,7 +204,7 @@ func (h *kGatewayParameters) getGatewayParametersForGatewayClass(ctx context.Con
 	gwp := &v1alpha1.GatewayParameters{}
 	err := h.cli.Get(ctx, client.ObjectKey{Namespace: gwpNamespace, Name: gwpName}, gwp)
 	if err != nil {
-		return nil, getGatewayParametersError(
+		return nil, deployer.GetGatewayParametersError(
 			err,
 			gwpNamespace, gwpName,
 			gwc.GetNamespace(), gwc.GetName(),
@@ -220,11 +216,11 @@ func (h *kGatewayParameters) getGatewayParametersForGatewayClass(ctx context.Con
 	// primarily done to ensure that the image registry and tag are
 	// correctly set when they aren't overridden by the GatewayParameters.
 	mergedGwp := defaultGwp
-	deepMergeGatewayParameters(mergedGwp, gwp)
+	deployer.DeepMergeGatewayParameters(mergedGwp, gwp)
 	return mergedGwp, nil
 }
 
-func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameters) (*helmConfig, error) {
+func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameters) (*deployer.HelmConfig, error) {
 	gwKey := ir.ObjectSource{
 		Group:     wellknown.GatewayGVK.GroupKind().Group,
 		Kind:      wellknown.GatewayGVK.GroupKind().Kind,
@@ -234,13 +230,13 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 	irGW := d.inputs.CommonCollections.GatewayIndex.Gateways.GetKey(gwKey.ResourceName())
 
 	// construct the default values
-	vals := &helmConfig{
-		Gateway: &helmGateway{
+	vals := &deployer.HelmConfig{
+		Gateway: &deployer.HelmGateway{
 			Name:             &gw.Name,
 			GatewayName:      &gw.Name,
 			GatewayNamespace: &gw.Namespace,
-			Ports:            getPortsValues(irGW, gwParam),
-			Xds: &helmXds{
+			Ports:            deployer.GetPortsValues(irGW, gwParam),
+			Xds: &deployer.HelmXds{
 				// The xds host/port MUST map to the Service definition for the Control Plane
 				// This is the socket address that the Proxy will connect to on startup, to receive xds updates
 				Host: &d.inputs.ControlPlane.XdsHost,
@@ -282,9 +278,9 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 	gateway.ReplicaCount = deployConfig.GetReplicas()
 
 	// service values
-	gateway.Service = getServiceValues(svcConfig)
+	gateway.Service = deployer.GetServiceValues(svcConfig)
 	// serviceaccount values
-	gateway.ServiceAccount = getServiceAccountValues(svcAccountConfig)
+	gateway.ServiceAccount = deployer.GetServiceAccountValues(svcAccountConfig)
 	// pod template values
 	gateway.ExtraPodAnnotations = podConfig.GetExtraAnnotations()
 	gateway.ExtraPodLabels = podConfig.GetExtraLabels()
@@ -302,7 +298,7 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 	logLevel := envoyContainerConfig.GetBootstrap().GetLogLevel()
 	compLogLevels := envoyContainerConfig.GetBootstrap().GetComponentLogLevels()
 	gateway.LogLevel = logLevel
-	compLogLevelStr, err := ComponentLogLevelsToString(compLogLevels)
+	compLogLevelStr, err := deployer.ComponentLogLevelsToString(compLogLevels)
 	if err != nil {
 		return nil, err
 	}
@@ -310,27 +306,27 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 
 	gateway.Resources = envoyContainerConfig.GetResources()
 	gateway.SecurityContext = envoyContainerConfig.GetSecurityContext()
-	gateway.Image = getImageValues(envoyContainerConfig.GetImage())
+	gateway.Image = deployer.GetImageValues(envoyContainerConfig.GetImage())
 
 	// istio values
-	gateway.Istio = getIstioValues(d.inputs.IstioAutoMtlsEnabled, istioConfig)
-	gateway.SdsContainer = getSdsContainerValues(sdsContainerConfig)
-	gateway.IstioContainer = getIstioContainerValues(istioContainerConfig)
+	gateway.Istio = deployer.GetIstioValues(d.inputs.IstioAutoMtlsEnabled, istioConfig)
+	gateway.SdsContainer = deployer.GetSdsContainerValues(sdsContainerConfig)
+	gateway.IstioContainer = deployer.GetIstioContainerValues(istioContainerConfig)
 
 	// ai values
-	gateway.AIExtension, err = getAIExtensionValues(aiExtensionConfig)
+	gateway.AIExtension, err = deployer.GetAIExtensionValues(aiExtensionConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO(npolshak): Currently we are using the same chart for both data planes. Should revisit having a separate chart for agentgateway: https://github.com/kgateway-dev/kgateway/issues/11240
 	// agentgateway integration values
-	gateway.AgentGateway, err = getAgentGatewayValues(agentGatewayConfig)
+	gateway.AgentGateway, err = deployer.GetAgentGatewayValues(agentGatewayConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	gateway.Stats = getStatsValues(statsConfig)
+	gateway.Stats = deployer.GetStatsValues(statsConfig)
 
 	return vals, nil
 }
@@ -350,137 +346,4 @@ func getGatewayClassFromGateway(ctx context.Context, cli client.Client, gw *api.
 	}
 
 	return gwc, nil
-}
-
-// getInMemoryGatewayParameters returns an in-memory GatewayParameters based on the name of the gateway class.
-func getInMemoryGatewayParameters(name string, imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
-	switch name {
-	case wellknown.WaypointClassName:
-		return defaultWaypointGatewayParameters(imageInfo)
-	case wellknown.GatewayClassName:
-		return defaultGatewayParameters(imageInfo)
-	case wellknown.AgentGatewayClassName:
-		return defaultAgentGatewayParameters(imageInfo)
-	default:
-		return defaultGatewayParameters(imageInfo)
-	}
-}
-
-// defaultAgentGatewayParameters returns an in-memory GatewayParameters with default values
-// set for the agentgateway deployment.
-func defaultAgentGatewayParameters(imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
-	gwp := defaultGatewayParameters(imageInfo)
-	gwp.Spec.Kube.AgentGateway = &v1alpha1.AgentGateway{
-		Enabled:  ptr.To(true),
-		LogLevel: ptr.To("info"),
-	}
-	return gwp
-}
-
-// defaultWaypointGatewayParameters returns an in-memory GatewayParameters with default values
-// set for the waypoint deployment.
-func defaultWaypointGatewayParameters(imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
-	gwp := defaultGatewayParameters(imageInfo)
-	gwp.Spec.Kube.Service.Type = ptr.To(corev1.ServiceTypeClusterIP)
-
-	if gwp.Spec.Kube.PodTemplate == nil {
-		gwp.Spec.Kube.PodTemplate = &v1alpha1.Pod{}
-	}
-	if gwp.Spec.Kube.PodTemplate.ExtraLabels == nil {
-		gwp.Spec.Kube.PodTemplate.ExtraLabels = make(map[string]string)
-	}
-	gwp.Spec.Kube.PodTemplate.ExtraLabels[label.IoIstioDataplaneMode.Name] = "ambient"
-
-	// do not have zTunnel resolve DNS for us - this can cause traffic loops when we're doing
-	// outbound based on DNS service entries
-	// TODO do we want this on the north-south gateway class as well?
-	if gwp.Spec.Kube.PodTemplate.ExtraAnnotations == nil {
-		gwp.Spec.Kube.PodTemplate.ExtraAnnotations = make(map[string]string)
-	}
-	gwp.Spec.Kube.PodTemplate.ExtraAnnotations[annotation.AmbientDnsCapture.Name] = "false"
-
-	return gwp
-}
-
-// defaultGatewayParameters returns an in-memory GatewayParameters with the default values
-// set for the gateway.
-func defaultGatewayParameters(imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
-	return &v1alpha1.GatewayParameters{
-		Spec: v1alpha1.GatewayParametersSpec{
-			SelfManaged: nil,
-			Kube: &v1alpha1.KubernetesProxyConfig{
-				Deployment: &v1alpha1.ProxyDeployment{
-					Replicas: ptr.To[uint32](1),
-				},
-				Service: &v1alpha1.Service{
-					Type: (*corev1.ServiceType)(ptr.To(string(corev1.ServiceTypeLoadBalancer))),
-				},
-				EnvoyContainer: &v1alpha1.EnvoyContainer{
-					Bootstrap: &v1alpha1.EnvoyBootstrap{
-						LogLevel: ptr.To("info"),
-					},
-					Image: &v1alpha1.Image{
-						Registry:   ptr.To(imageInfo.Registry),
-						Tag:        ptr.To(imageInfo.Tag),
-						Repository: ptr.To(EnvoyWrapperImage),
-						PullPolicy: (*corev1.PullPolicy)(ptr.To(imageInfo.PullPolicy)),
-					},
-					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: ptr.To(false),
-						ReadOnlyRootFilesystem:   ptr.To(true),
-						RunAsNonRoot:             ptr.To(true),
-						RunAsUser:                ptr.To[int64](10101),
-						Capabilities: &corev1.Capabilities{
-							Drop: []corev1.Capability{"ALL"},
-							Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-						},
-					},
-				},
-				Stats: &v1alpha1.StatsConfig{
-					Enabled:                 ptr.To(true),
-					RoutePrefixRewrite:      ptr.To("/stats/prometheus"),
-					EnableStatsRoute:        ptr.To(true),
-					StatsRoutePrefixRewrite: ptr.To("/stats"),
-				},
-				SdsContainer: &v1alpha1.SdsContainer{
-					Image: &v1alpha1.Image{
-						Registry:   ptr.To(imageInfo.Registry),
-						Tag:        ptr.To(imageInfo.Tag),
-						Repository: ptr.To(SdsImage),
-						PullPolicy: (*corev1.PullPolicy)(ptr.To(imageInfo.PullPolicy)),
-					},
-					Bootstrap: &v1alpha1.SdsBootstrap{
-						LogLevel: ptr.To("info"),
-					},
-				},
-				Istio: &v1alpha1.IstioIntegration{
-					IstioProxyContainer: &v1alpha1.IstioContainer{
-						Image: &v1alpha1.Image{
-							Registry:   ptr.To("docker.io/istio"),
-							Repository: ptr.To("proxyv2"),
-							Tag:        ptr.To("1.22.0"),
-							PullPolicy: (*corev1.PullPolicy)(ptr.To(imageInfo.PullPolicy)),
-						},
-						LogLevel:              ptr.To("warning"),
-						IstioDiscoveryAddress: ptr.To("istiod.istio-system.svc:15012"),
-						IstioMetaMeshId:       ptr.To("cluster.local"),
-						IstioMetaClusterId:    ptr.To("Kubernetes"),
-					},
-				},
-				AiExtension: &v1alpha1.AiExtension{
-					Enabled: ptr.To(false),
-					Image: &v1alpha1.Image{
-						Repository: ptr.To(KgatewayAIContainerName),
-						Registry:   ptr.To(imageInfo.Registry),
-						Tag:        ptr.To(imageInfo.Tag),
-						PullPolicy: (*corev1.PullPolicy)(ptr.To(imageInfo.PullPolicy)),
-					},
-				},
-				AgentGateway: &v1alpha1.AgentGateway{
-					Enabled:  ptr.To(false),
-					LogLevel: ptr.To("info"),
-				},
-			},
-		},
-	}
 }

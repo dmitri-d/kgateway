@@ -28,17 +28,17 @@ var ComponentLogLevelEmptyError = func(key string, value string) error {
 // Extract the listener ports from a Gateway and corresponding listener sets. These will be used to populate:
 // 1. the ports exposed on the envoy container
 // 2. the ports exposed on the proxy service
-func getPortsValues(gw *ir.Gateway, gwp *v1alpha1.GatewayParameters) []helmPort {
+func GetPortsValues(gw *ir.Gateway, gwp *v1alpha1.GatewayParameters) []helmPort {
 	gwPorts := []helmPort{}
 	for _, l := range gw.Listeners {
 		listenerPort := uint16(l.Port)
 		portName := listener.GenerateListenerName(l)
-		gwPorts = appendPortValue(gwPorts, listenerPort, portName, gwp)
+		gwPorts = AppendPortValue(gwPorts, listenerPort, portName, gwp)
 	}
 	return gwPorts
 }
 
-func sanitizePortName(name string) string {
+func SanitizePortName(name string) string {
 	nonAlphanumericRegex := regexp.MustCompile(`[^a-zA-Z0-9-]+`)
 	str := nonAlphanumericRegex.ReplaceAllString(name, "-")
 	doubleHyphen := regexp.MustCompile(`-{2,}`)
@@ -52,13 +52,13 @@ func sanitizePortName(name string) string {
 	return str
 }
 
-func appendPortValue(gwPorts []helmPort, port uint16, name string, gwp *v1alpha1.GatewayParameters) []helmPort {
+func AppendPortValue(gwPorts []helmPort, port uint16, name string, gwp *v1alpha1.GatewayParameters) []helmPort {
 	if slices.IndexFunc(gwPorts, func(p helmPort) bool { return *p.Port == port }) != -1 {
 		return gwPorts
 	}
 
 	targetPort := ports.TranslatePort(port)
-	portName := sanitizePortName(name)
+	portName := SanitizePortName(name)
 	protocol := "TCP"
 
 	// Search for static NodePort set from the GatewayParameters spec
@@ -102,7 +102,7 @@ func appendPortValue(gwPorts []helmPort, port uint16, name string, gwp *v1alpha1
 // }
 
 // Convert service values from GatewayParameters into helm values to be used by the deployer.
-func getServiceValues(svcConfig *v1alpha1.Service) *helmService {
+func GetServiceValues(svcConfig *v1alpha1.Service) *helmService {
 	// convert the service type enum to its string representation;
 	// if type is not set, it will default to 0 ("ClusterIP")
 	var svcType *string
@@ -118,7 +118,7 @@ func getServiceValues(svcConfig *v1alpha1.Service) *helmService {
 }
 
 // Convert service account values from GatewayParameters into helm values to be used by the deployer.
-func getServiceAccountValues(svcAccountConfig *v1alpha1.ServiceAccount) *helmServiceAccount {
+func GetServiceAccountValues(svcAccountConfig *v1alpha1.ServiceAccount) *helmServiceAccount {
 	return &helmServiceAccount{
 		ExtraAnnotations: svcAccountConfig.GetExtraAnnotations(),
 		ExtraLabels:      svcAccountConfig.GetExtraLabels(),
@@ -126,13 +126,13 @@ func getServiceAccountValues(svcAccountConfig *v1alpha1.ServiceAccount) *helmSer
 }
 
 // Convert sds values from GatewayParameters into helm values to be used by the deployer.
-func getSdsContainerValues(sdsContainerConfig *v1alpha1.SdsContainer) *helmSdsContainer {
+func GetSdsContainerValues(sdsContainerConfig *v1alpha1.SdsContainer) *helmSdsContainer {
 	if sdsContainerConfig == nil {
 		return nil
 	}
 
 	vals := &helmSdsContainer{
-		Image:           getImageValues(sdsContainerConfig.GetImage()),
+		Image:           GetImageValues(sdsContainerConfig.GetImage()),
 		Resources:       sdsContainerConfig.GetResources(),
 		SecurityContext: sdsContainerConfig.GetSecurityContext(),
 		SdsBootstrap:    &sdsBootstrap{},
@@ -147,13 +147,13 @@ func getSdsContainerValues(sdsContainerConfig *v1alpha1.SdsContainer) *helmSdsCo
 	return vals
 }
 
-func getIstioContainerValues(config *v1alpha1.IstioContainer) *helmIstioContainer {
+func GetIstioContainerValues(config *v1alpha1.IstioContainer) *helmIstioContainer {
 	if config == nil {
 		return nil
 	}
 
 	return &helmIstioContainer{
-		Image:                 getImageValues(config.GetImage()),
+		Image:                 GetImageValues(config.GetImage()),
 		LogLevel:              config.GetLogLevel(),
 		Resources:             config.GetResources(),
 		SecurityContext:       config.GetSecurityContext(),
@@ -164,7 +164,7 @@ func getIstioContainerValues(config *v1alpha1.IstioContainer) *helmIstioContaine
 }
 
 // Convert istio values from GatewayParameters into helm values to be used by the deployer.
-func getIstioValues(istioIntegrationEnabled bool, istioConfig *v1alpha1.IstioIntegration) *helmIstio {
+func GetIstioValues(istioIntegrationEnabled bool, istioConfig *v1alpha1.IstioIntegration) *helmIstio {
 	// if istioConfig is nil, istio sds is disabled and values can be ignored
 	if istioConfig == nil {
 		return &helmIstio{
@@ -178,7 +178,7 @@ func getIstioValues(istioIntegrationEnabled bool, istioConfig *v1alpha1.IstioInt
 }
 
 // Get the image values for the envoy container in the proxy deployment.
-func getImageValues(image *v1alpha1.Image) *helmImage {
+func GetImageValues(image *v1alpha1.Image) *helmImage {
 	if image == nil {
 		return &helmImage{}
 	}
@@ -197,7 +197,7 @@ func getImageValues(image *v1alpha1.Image) *helmImage {
 }
 
 // Get the stats values for the envoy listener in the configmap for bootstrap.
-func getStatsValues(statsConfig *v1alpha1.StatsConfig) *helmStatsConfig {
+func GetStatsValues(statsConfig *v1alpha1.StatsConfig) *helmStatsConfig {
 	if statsConfig == nil {
 		return nil
 	}
@@ -230,7 +230,7 @@ func ComponentLogLevelsToString(vals map[string]string) (string, error) {
 	return strings.Join(parts, ","), nil
 }
 
-func getAIExtensionValues(config *v1alpha1.AiExtension) (*helmAIExtension, error) {
+func GetAIExtensionValues(config *v1alpha1.AiExtension) (*helmAIExtension, error) {
 	if config == nil {
 		return nil, nil
 	}
@@ -248,7 +248,7 @@ func getAIExtensionValues(config *v1alpha1.AiExtension) (*helmAIExtension, error
 
 	return &helmAIExtension{
 		Enabled:         *config.GetEnabled(),
-		Image:           getImageValues(config.GetImage()),
+		Image:           GetImageValues(config.GetImage()),
 		SecurityContext: config.GetSecurityContext(),
 		Resources:       config.GetResources(),
 		Env:             config.GetEnv(),
@@ -257,7 +257,7 @@ func getAIExtensionValues(config *v1alpha1.AiExtension) (*helmAIExtension, error
 	}, nil
 }
 
-func getAgentGatewayValues(config *v1alpha1.AgentGateway) (*helmAgentGateway, error) {
+func GetAgentGatewayValues(config *v1alpha1.AgentGateway) (*helmAgentGateway, error) {
 	if config == nil {
 		return nil, nil
 	}
