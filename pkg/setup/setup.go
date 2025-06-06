@@ -5,8 +5,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	core "github.com/kgateway-dev/kgateway/v2/internal/kgateway/setup"
+	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 )

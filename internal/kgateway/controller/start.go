@@ -21,7 +21,6 @@ import (
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/inferenceextension/endpointpicker"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
@@ -32,6 +31,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
+	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"

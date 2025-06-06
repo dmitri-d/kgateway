@@ -32,7 +32,7 @@ import (
 	apixv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
 
 	gw2_v1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
+	internaldeployer "github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
@@ -40,6 +40,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/xds"
 	"github.com/kgateway-dev/kgateway/v2/internal/version"
+	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/schemes"
 
 	// TODO BML tests in this suite fail if this no-op import is not imported first.
@@ -346,8 +347,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwp := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwParams))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(gwc, gwParams), &deployer.Inputs{
+			gwp := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwParams))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, gwParams), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -375,7 +376,7 @@ var _ = Describe("Deployer", func() {
 
 	Context("self managed gateway", func() {
 		var (
-			d   *deployer.Deployer
+			d   *internaldeployer.Deployer
 			gwp *gw2_v1alpha1.GatewayParameters
 			gwc *api.GatewayClass
 		)
@@ -419,8 +420,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 			var err error
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-			d, err = deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
+			d, err = internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -485,8 +486,8 @@ var _ = Describe("Deployer", func() {
 					}},
 				},
 			}
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -523,12 +524,12 @@ var _ = Describe("Deployer", func() {
 
 	Context("watches", func() {
 		var (
-			d *deployer.Deployer
+			d *internaldeployer.Deployer
 		)
 		BeforeEach(func() {
 			var err error
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()))
-			d, err = deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()))
+			d, err = internaldeployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT()),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -596,8 +597,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams1 := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()))
-			d1, err := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGatewayParams()), &deployer.Inputs{
+			gwParams1 := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()))
+			d1, err := internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGatewayParams()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw1, gw2),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -612,8 +613,8 @@ var _ = Describe("Deployer", func() {
 			}, gwParams1)
 			Expect(err).NotTo(HaveOccurred())
 
-			gwParams2 := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()))
-			d2, err := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGatewayParams()), &deployer.Inputs{
+			gwParams2 := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()))
+			d2, err := internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGatewayParams()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw1, gw2),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -673,8 +674,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass()), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), defaultGatewayClass(), gw),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -712,8 +713,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass()), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), defaultGatewayClass(), gw),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
@@ -744,7 +745,7 @@ var _ = Describe("Deployer", func() {
 		})
 		When("a GC is created with an empty spec.parametersRef", func() {
 			var (
-				d *deployer.Deployer
+				d *internaldeployer.Deployer
 			)
 			It("should use the default in-memory GWP", func() {
 				var objs clientObjects
@@ -770,8 +771,8 @@ var _ = Describe("Deployer", func() {
 					},
 				}
 
-				gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc))
-				d, err = deployer.NewDeployer(newFakeClientWithObjs(gwc), &deployer.Inputs{
+				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc))
+				d, err = internaldeployer.NewDeployer(newFakeClientWithObjs(gwc), &deployer.Inputs{
 					CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
 					ControllerName:    wellknown.GatewayControllerName,
 					Dev:               false,
@@ -797,13 +798,13 @@ var _ = Describe("Deployer", func() {
 				Expect(objs.findConfigMap(defaultNamespace, "foo")).NotTo(BeNil())
 
 				By("validating the default values are used")
-				Expect(objs.findDeployment(defaultNamespace, "foo").Spec.Template.Spec.Containers[0].Image).To(Equal(fmt.Sprintf("%s/%s:%s", registry, deployer.EnvoyWrapperImage, tag)))
+				Expect(objs.findDeployment(defaultNamespace, "foo").Spec.Template.Spec.Containers[0].Image).To(Equal(fmt.Sprintf("%s/%s:%s", registry, internaldeployer.EnvoyWrapperImage, tag)))
 			})
 		})
 
 		When("a Gateway has a GWP attached", func() {
 			var (
-				d   *deployer.Deployer
+				d   *internaldeployer.Deployer
 				gwp *gw2_v1alpha1.GatewayParameters
 			)
 			BeforeEach(func() {
@@ -855,8 +856,8 @@ var _ = Describe("Deployer", func() {
 					},
 				}
 				gwc := defaultGatewayClass()
-				gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-				d, err = deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
+				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
+				d, err = internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 					CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
 					ControllerName:    wellknown.GatewayControllerName,
 					Dev:               false,
@@ -882,13 +883,13 @@ var _ = Describe("Deployer", func() {
 				Expect(objs.findConfigMap(defaultNamespace, "foo")).NotTo(BeNil())
 
 				By("validating the image overrides the default")
-				Expect(objs.findDeployment(defaultNamespace, "foo").Spec.Template.Spec.Containers[0].Image).To(Equal(fmt.Sprintf("bar/%s:2.3.4", deployer.EnvoyWrapperImage)))
+				Expect(objs.findDeployment(defaultNamespace, "foo").Spec.Template.Spec.Containers[0].Image).To(Equal(fmt.Sprintf("bar/%s:2.3.4", internaldeployer.EnvoyWrapperImage)))
 			})
 		})
 
 		When("a Gateway has a minimal GatewayParameters with only overrides", func() {
 			var (
-				d   *deployer.Deployer
+				d   *internaldeployer.Deployer
 				gwp *gw2_v1alpha1.GatewayParameters
 				gwc *api.GatewayClass
 			)
@@ -948,8 +949,8 @@ var _ = Describe("Deployer", func() {
 						}},
 					},
 				}
-				gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-				d, err = deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
+				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
+				d, err = internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 					CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
 					ControllerName:    wellknown.GatewayControllerName,
 					Dev:               false,
@@ -1000,7 +1001,7 @@ var _ = Describe("Deployer", func() {
 				Expect(port.PortValue).To(Equal(uint32(9091)))
 
 				By("verifying image registry and tag were inherited")
-				Expect(envoyContainer.Image).To(Equal(fmt.Sprintf("%s/%s:%s", registry, deployer.EnvoyWrapperImage, tag)))
+				Expect(envoyContainer.Image).To(Equal(fmt.Sprintf("%s/%s:%s", registry, internaldeployer.EnvoyWrapperImage, tag)))
 			})
 		})
 	})
@@ -1550,16 +1551,16 @@ var _ = Describe("Deployer", func() {
 			var sdsContainer, istioProxyContainer, aiContainer, gwContainer corev1.Container
 			for _, container := range containers {
 				switch container.Name {
-				case deployer.SdsContainerName:
+				case internaldeployer.SdsContainerName:
 					sdsContainer = container
 					foundSds = true
-				case deployer.IstioContainerName:
+				case internaldeployer.IstioContainerName:
 					istioProxyContainer = container
 					foundIstioProxy = true
-				case deployer.KgatewayContainerName:
+				case internaldeployer.KgatewayContainerName:
 					gwContainer = container
 					foundGw = true
-				case deployer.KgatewayAIContainerName:
+				case internaldeployer.KgatewayAIContainerName:
 					aiContainer = container
 					foundAIExtension = true
 				default:
@@ -1668,8 +1669,8 @@ var _ = Describe("Deployer", func() {
 				overrideGwp = &gw2_v1alpha1.GatewayParameters{}
 			}
 
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), inp.dInputs, gwParams)
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), inp.dInputs, gwParams)
 			if checkErr(err, expected.newDeployerErr) {
 				return
 			}
@@ -1946,14 +1947,14 @@ var _ = Describe("Deployer", func() {
 				gw:         defaultGatewayWithGatewayParams("bad-gwp"),
 				defaultGwp: defaultGatewayParams(),
 			}, &expectedOutput{
-				getObjsErr: deployer.GetGatewayParametersError,
+				getObjsErr: internaldeployer.GetGatewayParametersError,
 			}),
 			Entry("nil inputs to NewDeployer", &input{
 				dInputs:    nil,
 				gw:         defaultGateway(),
 				defaultGwp: defaultGatewayParams(),
 			}, &expectedOutput{
-				newDeployerErr: deployer.NilDeployerInputsErr,
+				newDeployerErr: internaldeployer.NilDeployerInputsErr,
 			}),
 			Entry("No GatewayParameters override but default is self-managed; should not deploy gateway", &input{
 				dInputs:    defaultDeployerInputs(),
@@ -1997,8 +1998,8 @@ var _ = Describe("Deployer", func() {
 			}
 
 			// Initialize a new deployer with InferenceExtension inputs.
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(pool))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(pool), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(pool))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(pool), &deployer.Inputs{
 				CommonCollections:  newCommonCols(GinkgoT()),
 				ControllerName:     wellknown.GatewayControllerName,
 				InferenceExtension: &deployer.InferenceExtInfo{},
@@ -2047,7 +2048,7 @@ var _ = Describe("Deployer", func() {
 			// Check that owner references are set on all rendered objects to the InferencePool.
 			for _, obj := range objs {
 				gvk := obj.GetObjectKind().GroupVersionKind()
-				if deployer.IsNamespaced(gvk) {
+				if internaldeployer.IsNamespaced(gvk) {
 					ownerRefs := obj.GetOwnerReferences()
 					Expect(ownerRefs).To(HaveLen(1))
 					ref := ownerRefs[0]
@@ -2096,8 +2097,8 @@ var _ = Describe("Deployer", func() {
 			}
 
 			// Initialize a new deployer without InferenceExtension inputs.
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(pool))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(pool), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(pool))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(pool), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT()),
 				ControllerName:    wellknown.GatewayControllerName,
 			}, gwParams)
@@ -2165,8 +2166,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams := deployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()))
-			d, err := deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()), &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()))
+			d, err := internaldeployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), defaultGatewayClass(), gw, ls),
 				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,

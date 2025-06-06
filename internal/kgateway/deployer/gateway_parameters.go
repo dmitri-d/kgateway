@@ -17,37 +17,29 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 )
-
-type HelmValuesGenerator interface {
-	GetValues(ctx context.Context, gw *api.Gateway, inputs *Inputs) (map[string]any, error)
-}
-
-type ExtraGatewayParameters struct {
-	Object    client.Object
-	Generator HelmValuesGenerator
-}
 
 func NewGatewayParameters(cli client.Client) *GatewayParameters {
 	return &GatewayParameters{
 		cli:               cli,
 		knownGWParameters: []client.Object{&v1alpha1.GatewayParameters{}}, // always include default GatewayParameters
-		extraHVGenerators: make(map[schema.GroupKind]HelmValuesGenerator),
+		extraHVGenerators: make(map[schema.GroupKind]deployer.HelmValuesGenerator),
 	}
 }
 
 type GatewayParameters struct {
 	cli               client.Client
-	extraHVGenerators map[schema.GroupKind]HelmValuesGenerator
+	extraHVGenerators map[schema.GroupKind]deployer.HelmValuesGenerator
 	knownGWParameters []client.Object
 }
 
 type kGatewayParameters struct {
 	cli    client.Client
-	inputs *Inputs
+	inputs *deployer.Inputs
 }
 
-func (gp *GatewayParameters) WithExtraGatewayParameters(params ...ExtraGatewayParameters) *GatewayParameters {
+func (gp *GatewayParameters) WithExtraGatewayParameters(params ...deployer.ExtraGatewayParameters) *GatewayParameters {
 	for _, p := range params {
 		gp.knownGWParameters = append(gp.knownGWParameters, p.Object)
 		group := p.Object.GetObjectKind().GroupVersionKind().Group
@@ -61,7 +53,7 @@ func (gp *GatewayParameters) AllKnownGatewayParameters() []client.Object {
 	return slices.Clone(gp.knownGWParameters)
 }
 
-func (gp *GatewayParameters) GetValues(ctx context.Context, gw *api.Gateway, inputs *Inputs) (map[string]any, error) {
+func (gp *GatewayParameters) GetValues(ctx context.Context, gw *api.Gateway, inputs *deployer.Inputs) (map[string]any, error) {
 	logger := log.FromContext(ctx)
 
 	ref, err := gp.getGatewayParametersRef(ctx, gw)
@@ -115,7 +107,7 @@ func (gp *GatewayParameters) getDefaultGatewayParametersRef(ctx context.Context,
 	return schema.GroupKind{}, nil
 }
 
-func newKGatewayParameters(cli client.Client, inputs *Inputs) *kGatewayParameters {
+func newKGatewayParameters(cli client.Client, inputs *deployer.Inputs) *kGatewayParameters {
 	return &kGatewayParameters{cli: cli, inputs: inputs}
 }
 
@@ -361,7 +353,7 @@ func getGatewayClassFromGateway(ctx context.Context, cli client.Client, gw *api.
 }
 
 // getInMemoryGatewayParameters returns an in-memory GatewayParameters based on the name of the gateway class.
-func getInMemoryGatewayParameters(name string, imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
+func getInMemoryGatewayParameters(name string, imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
 	switch name {
 	case wellknown.WaypointClassName:
 		return defaultWaypointGatewayParameters(imageInfo)
@@ -376,7 +368,7 @@ func getInMemoryGatewayParameters(name string, imageInfo *ImageInfo) *v1alpha1.G
 
 // defaultAgentGatewayParameters returns an in-memory GatewayParameters with default values
 // set for the agentgateway deployment.
-func defaultAgentGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
+func defaultAgentGatewayParameters(imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
 	gwp := defaultGatewayParameters(imageInfo)
 	gwp.Spec.Kube.AgentGateway = &v1alpha1.AgentGateway{
 		Enabled:  ptr.To(true),
@@ -387,7 +379,7 @@ func defaultAgentGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParame
 
 // defaultWaypointGatewayParameters returns an in-memory GatewayParameters with default values
 // set for the waypoint deployment.
-func defaultWaypointGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
+func defaultWaypointGatewayParameters(imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
 	gwp := defaultGatewayParameters(imageInfo)
 	gwp.Spec.Kube.Service.Type = ptr.To(corev1.ServiceTypeClusterIP)
 
@@ -412,7 +404,7 @@ func defaultWaypointGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayPar
 
 // defaultGatewayParameters returns an in-memory GatewayParameters with the default values
 // set for the gateway.
-func defaultGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
+func defaultGatewayParameters(imageInfo *deployer.ImageInfo) *v1alpha1.GatewayParameters {
 	return &v1alpha1.GatewayParameters{
 		Spec: v1alpha1.GatewayParametersSpec{
 			SelfManaged: nil,

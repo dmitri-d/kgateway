@@ -25,9 +25,10 @@ import (
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	apiv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
+	internaldeployer "github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 )
 
@@ -189,11 +190,11 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 		ImageInfo:            c.cfg.ImageInfo,
 		CommonCollections:    c.cfg.CommonCollections,
 	}
-	gwParams := deployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
+	gwParams := internaldeployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
 	if c.extraGatewayParameters != nil {
 		gwParams.WithExtraGatewayParameters(c.extraGatewayParameters(c.cfg.Mgr.GetClient(), inputs)...)
 	}
-	d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, gwParams)
+	d, err := internaldeployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, gwParams)
 	if err != nil {
 		return err
 	}
@@ -426,11 +427,11 @@ func (c *controllerBuilder) watchInferencePool(ctx context.Context) error {
 			InferenceExtension: c.poolCfg.InferenceExt,
 			CommonCollections:  c.cfg.CommonCollections,
 		}
-		gwParams := deployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
+		gwParams := internaldeployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
 		if c.extraGatewayParameters != nil {
 			gwParams.WithExtraGatewayParameters(c.extraGatewayParameters(c.cfg.Mgr.GetClient(), inputs)...)
 		}
-		d, err := deployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, gwParams)
+		d, err := internaldeployer.NewDeployer(c.cfg.Mgr.GetClient(), inputs, gwParams)
 		if err != nil {
 			return err
 		}

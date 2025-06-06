@@ -33,7 +33,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/helm"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/internal/version"
-	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
+	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 )
 
 var (
@@ -51,39 +51,14 @@ type Deployer struct {
 	chart *chart.Chart
 	cli   client.Client
 
-	inputs     *Inputs
-	helmValues HelmValuesGenerator
-}
-
-type ControlPlaneInfo struct {
-	XdsHost string
-	XdsPort uint32
-}
-
-// InferenceExtInfo defines the runtime state of Gateway API inference extensions.
-type InferenceExtInfo struct{}
-
-// Inputs is the set of options used to configure the deployer deployment.
-type Inputs struct {
-	ControllerName       string
-	Dev                  bool
-	IstioAutoMtlsEnabled bool
-	ControlPlane         ControlPlaneInfo
-	InferenceExtension   *InferenceExtInfo
-	ImageInfo            *ImageInfo
-	CommonCollections    *common.CommonCollections
-}
-
-type ImageInfo struct {
-	Registry   string
-	Tag        string
-	PullPolicy string
+	inputs     *deployer.Inputs
+	helmValues deployer.HelmValuesGenerator
 }
 
 // NewDeployer creates a new gateway deployer.
 // TODO [danehans]: Reloading the chart for every reconciliation is inefficient.
 // See https://github.com/kgateway-dev/kgateway/issues/10672 for details.
-func NewDeployer(cli client.Client, inputs *Inputs, hvg HelmValuesGenerator) (*Deployer, error) {
+func NewDeployer(cli client.Client, inputs *deployer.Inputs, hvg deployer.HelmValuesGenerator) (*Deployer, error) {
 	if inputs == nil {
 		return nil, NilDeployerInputsErr
 	}
