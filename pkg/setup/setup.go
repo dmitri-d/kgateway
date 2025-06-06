@@ -12,7 +12,7 @@ import (
 
 type Options struct {
 	ExtraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	ExtraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.GatewayParameters
+	ExtraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 }
 
 func New(opts Options) core.Server {
