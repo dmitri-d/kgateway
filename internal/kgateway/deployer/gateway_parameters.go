@@ -19,7 +19,7 @@ import (
 )
 
 type HelmValuesGenerator interface {
-	GetValues(ctx context.Context, gw *api.Gateway, inputs *Inputs) (*helmConfig, error)
+	GetValues(ctx context.Context, gw *api.Gateway, inputs *Inputs) (map[string]any, error)
 }
 
 type ExtraGatewayParameters struct {
@@ -60,7 +60,7 @@ func (gp *GatewayParameters) AllKnownGatewayParameters() []client.Object {
 	return slices.Clone(gp.knownGWParameters)
 }
 
-func (gp *GatewayParameters) GetValues(ctx context.Context, gw *api.Gateway, inputs *Inputs) (*helmConfig, error) {
+func (gp *GatewayParameters) GetValues(ctx context.Context, gw *api.Gateway, inputs *Inputs) (map[string]any, error) {
 	logger := log.FromContext(ctx)
 
 	ref, err := gp.getGatewayParametersRef(ctx, gw)
@@ -118,7 +118,7 @@ func newKGatewayParameters(cli client.Client, inputs *Inputs) *kGatewayParameter
 	return &kGatewayParameters{cli: cli, inputs: inputs}
 }
 
-func (h *kGatewayParameters) GetValues(ctx context.Context, gw *api.Gateway) (*helmConfig, error) {
+func (h *kGatewayParameters) GetValues(ctx context.Context, gw *api.Gateway) (map[string]any, error) {
 	gwParam, err := h.getGatewayParametersForGateway(ctx, gw)
 	if err != nil {
 		return nil, err
@@ -126,7 +126,14 @@ func (h *kGatewayParameters) GetValues(ctx context.Context, gw *api.Gateway) (*h
 	if gwParam != nil && gwParam.Spec.SelfManaged != nil {
 		return nil, nil
 	}
-	return h.getValues(gw, gwParam)
+	vals, err := h.getValues(gw, gwParam)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonVals map[string]any
+	err = jsonConvert(vals, &jsonVals)
+	return jsonVals, err
 }
 
 // getGatewayParametersForGateway returns the merged GatewayParameters object resulting from the default GwParams object and
