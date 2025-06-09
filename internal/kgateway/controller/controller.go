@@ -199,7 +199,8 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	d := deployer.NewDeployer(c.cfg.Mgr.GetClient(), chart, inputs, gwParams)
+	d := deployer.NewDeployer(
+		c.cfg.Mgr.GetClient(), chart, inputs, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
 	gvks, err := c.getGvksToWatch(ctx, d, map[string]any{
 		"gateway": map[string]any{
 			"istio": map[string]any{
@@ -435,15 +436,14 @@ func (c *controllerBuilder) watchInferencePool(ctx context.Context) error {
 			InferenceExtension: c.poolCfg.InferenceExt,
 			CommonCollections:  c.cfg.CommonCollections,
 		}
-		gwParams := internaldeployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
-		if c.extraGatewayParameters != nil {
-			gwParams.WithExtraGatewayParameters(c.extraGatewayParameters(c.cfg.Mgr.GetClient(), inputs)...)
-		}
+		inferenceExt := &internaldeployer.InferenceExtension{}
 		chart, err := LoadInferenceExtensionChart()
 		if err != nil {
 			return err
 		}
-		d := deployer.NewDeployer(c.cfg.Mgr.GetClient(), chart, inputs, gwParams)
+		d := deployer.NewDeployer(
+			c.cfg.Mgr.GetClient(), chart, inputs, inferenceExt,
+			internaldeployer.InferenceExtensionReleaseNameAndNamespace)
 		// Watch child objects, e.g. Deployments, created by the inference pool deployer.
 		gvks, err := c.getGvksToWatch(ctx, d, map[string]any{
 			"inferenceExtension": map[string]any{

@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
-	api "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 
@@ -59,19 +58,25 @@ type Deployer struct {
 	chart *chart.Chart
 	cli   client.Client
 
-	inputs     *Inputs
-	helmValues HelmValuesGenerator
+	inputs                               *Inputs
+	helmValues                           HelmValuesGenerator
+	helmReleaseNameAndNamespaceGenerator func(obj client.Object) (string, string)
 }
 
 // NewDeployer creates a new gateway
 // TODO [danehans]: Reloading the chart for every reconciliation is inefficient.
 // See https://github.com/kgateway-dev/kgateway/issues/10672 for details.
-func NewDeployer(cli client.Client, chart *chart.Chart, inputs *Inputs, hvg HelmValuesGenerator) *Deployer {
+func NewDeployer(cli client.Client,
+	chart *chart.Chart,
+	inputs *Inputs,
+	hvg HelmValuesGenerator,
+	helmReleaseNameAndNamespaceGenerator func(obj client.Object) (string, string)) *Deployer {
 	return &Deployer{
-		cli:        cli,
-		chart:      chart,
-		inputs:     inputs,
-		helmValues: hvg,
+		cli:                                  cli,
+		chart:                                chart,
+		inputs:                               inputs,
+		helmValues:                           hvg,
+		helmReleaseNameAndNamespaceGenerator: helmReleaseNameAndNamespaceGenerator,
 	}
 }
 
@@ -94,28 +99,6 @@ func (d *Deployer) RenderChartToObjects(ns, name string, vals map[string]any) ([
 	}
 
 	return objs, nil
-}
-
-func (d *Deployer) getInferExtVals(pool *infextv1a2.InferencePool) (*HelmConfig, error) {
-	if d.inputs.InferenceExtension == nil {
-		return nil, fmt.Errorf("inference extension input not defined for deployer")
-	}
-
-	if pool == nil {
-		return nil, fmt.Errorf("inference pool is not defined for deployer")
-	}
-
-	// construct the default values
-	vals := &HelmConfig{
-		InferenceExtension: &HelmInferenceExtension{
-			EndpointPicker: &HelmEndpointPickerExtension{
-				PoolName:      pool.Name,
-				PoolNamespace: pool.Namespace,
-			},
-		},
-	}
-
-	return vals, nil
 }
 
 // Render relies on a `helm install` to render the Chart with the injected values
@@ -163,82 +146,47 @@ func (d *Deployer) Render(name, ns string, vals map[string]any) ([]client.Object
 // * sets ownerRefs on all generated objects
 //
 // * returns the objects to be deployed by the caller
-func (d *Deployer) GetObjsToDeploy(ctx context.Context, gw *api.Gateway) ([]client.Object, error) {
+func (d *Deployer) GetObjsToDeploy(ctx context.Context, obj client.Object) ([]client.Object, error) {
 	logger := log.FromContext(ctx)
 
-	vals, err := d.helmValues.GetValues(ctx, gw, d.inputs)
+	vals, err := d.helmValues.GetValues(ctx, obj, d.inputs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get helm values for gateway %s.%s: %w", gw.GetNamespace(), gw.GetName(), err)
+		return nil, fmt.Errorf("failed to get helm values %s.%s: %w", obj.GetNamespace(), obj.GetName(), err)
 	}
 	if vals == nil {
 		return nil, nil
 	}
 	logger.V(1).Info("got deployer helm values",
-		"gatewayName", gw.GetName(),
-		"gatewayNamespace", gw.GetNamespace(),
+		"name", obj.GetName(),
+		"namespace", obj.GetNamespace(),
+		"gvk", obj.GetObjectKind().GroupVersionKind().String(),
 		"values", vals,
 	)
 
-	objs, err := d.RenderChartToObjects(gw.Namespace, gw.Name, vals)
+	rname, rns := d.helmReleaseNameAndNamespaceGenerator(obj)
+	objs, err := d.Render(rname, rns, vals)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get objects to deploy for gateway %s.%s: %w", gw.GetNamespace(), gw.GetName(), err)
+		return nil, fmt.Errorf("failed to get objects to deploy %s.%s: %w", obj.GetNamespace(), obj.GetName(), err)
 	}
-
-	// Set owner ref
-	for _, obj := range objs {
-		obj.SetOwnerReferences([]metav1.OwnerReference{{
-			Kind:       gw.Kind,
-			APIVersion: gw.APIVersion,
-			Controller: ptr.To(true),
-			UID:        gw.UID,
-			Name:       gw.Name,
-		}})
-	}
-
-	return objs, nil
-}
-
-// GetEndpointPickerObjs renders endpoint picker objects using the configured helm chart.
-// It builds Helm values from the given pool and renders objects required by the endpoint picker extension.
-func (d *Deployer) GetEndpointPickerObjs(pool *infextv1a2.InferencePool) ([]client.Object, error) {
-	// Build the helm values for the inference extension.
-	vals, err := d.getInferExtVals(pool)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert the helm values struct.
-	var convertedVals map[string]any
-	if err := JsonConvert(vals, &convertedVals); err != nil {
-		return nil, fmt.Errorf("failed to convert inference extension helm values: %w", err)
-	}
-
-	// Use a unique release name for the endpoint picker child objects.
-	releaseName := fmt.Sprintf("%s-endpoint-picker", pool.Name)
-	objs, err := d.Render(releaseName, pool.Namespace, convertedVals)
-	if err != nil {
-		return nil, fmt.Errorf("failed to render inference extension objects: %w", err)
-	}
-
 	// Ensure that each namespaced rendered object has its namespace and ownerRef set.
-	for _, obj := range objs {
-		gvk := obj.GetObjectKind().GroupVersionKind()
+	for _, renderedObj := range objs {
+		gvk := renderedObj.GetObjectKind().GroupVersionKind()
 		if IsNamespaced(gvk) {
-			if obj.GetNamespace() == "" {
-				obj.SetNamespace(pool.Namespace)
+			if renderedObj.GetNamespace() == "" {
+				renderedObj.SetNamespace(obj.GetNamespace())
 			}
-			obj.SetOwnerReferences([]metav1.OwnerReference{{
-				APIVersion: pool.APIVersion,
-				Kind:       pool.Kind,
-				Name:       pool.Name,
-				UID:        pool.UID,
+			renderedObj.SetOwnerReferences([]metav1.OwnerReference{{
+				APIVersion: obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+				Kind:       obj.GetObjectKind().GroupVersionKind().Kind,
+				Name:       obj.GetName(),
+				UID:        obj.GetUID(),
 				Controller: ptr.To(true),
 			}})
 		} else {
 			// TODO [danehans]: Not sure why a ns must be set for cluster-scoped objects:
 			// "failed to apply object rbac.authorization.k8s.io/v1, Kind=ClusterRoleBinding
 			// vllm-llama2-7b-pool-endpoint-picker: Namespace parameter required".
-			obj.SetNamespace("")
+			renderedObj.SetNamespace("")
 		}
 	}
 

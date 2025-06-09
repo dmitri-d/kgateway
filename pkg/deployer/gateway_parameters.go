@@ -10,11 +10,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	api "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 type HelmValuesGenerator interface {
-	GetValues(ctx context.Context, gw *api.Gateway, inputs *Inputs) (map[string]any, error)
+	GetValues(ctx context.Context, obj client.Object, inputs *Inputs) (map[string]any, error)
 }
 
 type ExtraGatewayParameters struct {

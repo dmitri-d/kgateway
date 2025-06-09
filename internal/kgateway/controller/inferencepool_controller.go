@@ -74,7 +74,7 @@ func (r *inferencePoolReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	objs, err := r.deployer.GetEndpointPickerObjs(pool)
+	objs, err := r.deployer.GetObjsToDeploy(ctx, pool)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

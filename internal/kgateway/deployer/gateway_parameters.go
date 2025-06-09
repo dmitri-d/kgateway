@@ -2,6 +2,7 @@ package deployer
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/rotisserie/eris"
@@ -49,8 +50,13 @@ func (gp *GatewayParameters) AllKnownGatewayParameters() []client.Object {
 	return slices.Clone(gp.knownGWParameters)
 }
 
-func (gp *GatewayParameters) GetValues(ctx context.Context, gw *api.Gateway, inputs *deployer.Inputs) (map[string]any, error) {
+func (gp *GatewayParameters) GetValues(ctx context.Context, obj client.Object, inputs *deployer.Inputs) (map[string]any, error) {
 	logger := log.FromContext(ctx)
+
+	gw, ok := obj.(*api.Gateway)
+	if !ok {
+		return nil, fmt.Errorf("expected a Gateway resource, got %s", obj.GetObjectKind().GroupVersionKind().String())
+	}
 
 	ref, err := gp.getGatewayParametersRef(ctx, gw)
 	if err != nil {
@@ -66,6 +72,10 @@ func (gp *GatewayParameters) GetValues(ctx context.Context, gw *api.Gateway, inp
 	)
 
 	return newKGatewayParameters(gp.cli, inputs).GetValues(ctx, gw)
+}
+
+func GatewayReleaseNameAndNamespace(obj client.Object) (string, string) {
+	return obj.GetName(), obj.GetNamespace()
 }
 
 func (gp *GatewayParameters) getGatewayParametersRef(ctx context.Context, gw *api.Gateway) (schema.GroupKind, error) {

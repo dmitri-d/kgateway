@@ -363,7 +363,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwp)
+			},
+				gwp,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			var objs clientObjects
 			objs, err = d.GetObjsToDeploy(context.Background(), gw)
@@ -437,7 +439,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams)
+			},
+				gwParams,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			objs, err := d.GetObjsToDeploy(context.Background(), gw)
 			Expect(err).ToNot(HaveOccurred())
@@ -504,7 +508,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams)
+			},
+				gwParams,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			var objs clientObjects
 			objs, err = d.GetObjsToDeploy(context.Background(), gw)
@@ -617,7 +623,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams1)
+			},
+				gwParams1,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			gwParams2 := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()))
 			d2 := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGatewayParams()), chart, &deployer.Inputs{
@@ -632,7 +640,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams2)
+			},
+				gwParams2,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			var objs1, objs2 clientObjects
 			objs1, err = d1.GetObjsToDeploy(context.Background(), gw1)
@@ -694,7 +704,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams)
+			},
+				gwParams,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			_, err = d.GetObjsToDeploy(context.Background(), gw)
 			Expect(err).To(MatchError(ContainSubstring("invalid group invalid.group for GatewayParameters")))
@@ -734,7 +746,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams)
+			},
+				gwParams,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = d.GetObjsToDeploy(context.Background(), gw)
@@ -794,7 +808,9 @@ var _ = Describe("Deployer", func() {
 						Registry: registry,
 						Tag:      tag,
 					},
-				}, gwParams)
+				},
+					gwParams,
+					internaldeployer.GatewayReleaseNameAndNamespace)
 
 				objs, err = d.GetObjsToDeploy(context.Background(), gw)
 				Expect(err).NotTo(HaveOccurred())
@@ -880,7 +896,9 @@ var _ = Describe("Deployer", func() {
 						Registry: registry,
 						Tag:      tag,
 					},
-				}, gwParams)
+				},
+					gwParams,
+					internaldeployer.GatewayReleaseNameAndNamespace)
 
 				objs, err = d.GetObjsToDeploy(context.Background(), gw)
 				Expect(err).NotTo(HaveOccurred())
@@ -974,7 +992,9 @@ var _ = Describe("Deployer", func() {
 						Registry: registry,
 						Tag:      tag,
 					},
-				}, gwParams)
+				},
+					gwParams,
+					internaldeployer.GatewayReleaseNameAndNamespace)
 
 				objs, err = d.GetObjsToDeploy(context.Background(), gw)
 				Expect(err).NotTo(HaveOccurred())
@@ -1683,7 +1703,9 @@ var _ = Describe("Deployer", func() {
 			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp))
 			chart, err := controller.LoadKgatewayChart()
 			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), chart, inp.dInputs, gwParams)
+			d := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), chart, inp.dInputs,
+				gwParams,
+				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			objs, err := d.GetObjsToDeploy(context.Background(), inp.gw)
 			if checkErr(err, expected.getObjsErr) {
@@ -2001,7 +2023,7 @@ var _ = Describe("Deployer", func() {
 			}
 
 			// Initialize a new deployer with InferenceExtension inputs.
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(pool))
+			ie := &internaldeployer.InferenceExtension{}
 			chart, err := controller.LoadInferenceExtensionChart()
 			Expect(err).NotTo(HaveOccurred())
 			d := deployer.NewDeployer(newFakeClientWithObjs(pool), chart, &deployer.Inputs{
@@ -2012,7 +2034,9 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams)
+			},
+				ie,
+				internaldeployer.InferenceExtensionReleaseNameAndNamespace)
 
 			// Simulate reconciliation so that the pool gets its finalizer added.
 			err = d.EnsureFinalizer(context.Background(), pool)
@@ -2022,7 +2046,7 @@ var _ = Describe("Deployer", func() {
 			Expect(pool.GetFinalizers()).To(ContainElement(wellknown.InferencePoolFinalizer))
 
 			// Get the endpoint picker objects for the InferencePool.
-			objs, err := d.GetEndpointPickerObjs(pool)
+			objs, err := d.GetObjsToDeploy(nil, pool)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(objs).NotTo(BeEmpty(), "expected non-empty objects for endpoint picker deployment")
 			Expect(objs).To(HaveLen(4))
@@ -2084,34 +2108,6 @@ var _ = Describe("Deployer", func() {
 				"-grpcHealthPort",
 				"9003",
 			}))
-		})
-
-		It("should deploy endpoint picker resources for an InferencePool when autoProvision is enabled", func() {
-			// Create a fake InferencePool resource.
-			pool := &infextv1a2.InferencePool{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       wellknown.InferencePoolKind,
-					APIVersion: fmt.Sprintf("%s/%s", infextv1a2.GroupVersion.Group, infextv1a2.GroupVersion.Version),
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pool1",
-					Namespace: defaultNamespace,
-					UID:       "pool-uid",
-				},
-			}
-
-			// Initialize a new deployer without InferenceExtension inputs.
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(pool))
-			chart, err := controller.LoadInferenceExtensionChart()
-			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(pool), chart, &deployer.Inputs{
-				CommonCollections: newCommonCols(GinkgoT()),
-				ControllerName:    wellknown.GatewayControllerName,
-			}, gwParams)
-
-			// Getting endpoint picker objects for the InferencePool should return an error.
-			_, err = d.GetEndpointPickerObjs(pool)
-			Expect(err).To(HaveOccurred())
 		})
 	})
 
@@ -2185,7 +2181,7 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			}, gwParams)
+			}, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
 
 			var objs clientObjects
 			objs, err = d.GetObjsToDeploy(context.Background(), gw)
