@@ -121,7 +121,7 @@ func (h *kGatewayParameters) GetValues(ctx context.Context, gw *api.Gateway) (ma
 	}
 
 	var jsonVals map[string]any
-	err = jsonConvert(vals, &jsonVals)
+	err = deployer.JsonConvert(vals, &jsonVals)
 	return jsonVals, err
 }
 
@@ -256,7 +256,7 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 
 	// Apply the floating user ID if it is set
 	if gwParam.Spec.Kube.GetFloatingUserId() != nil && *gwParam.Spec.Kube.GetFloatingUserId() {
-		applyFloatingUserId(gwParam.Spec.Kube)
+		deployer.ApplyFloatingUserId(gwParam.Spec.Kube)
 	}
 
 	kubeProxyConfig := gwParam.Spec.Kube

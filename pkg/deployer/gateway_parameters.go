@@ -22,6 +22,34 @@ type ExtraGatewayParameters struct {
 	Generator HelmValuesGenerator
 }
 
+// applyFloatingUserId will set the RunAsUser field from all security contexts to null if the floatingUserId field is set
+func ApplyFloatingUserId(dstKube *v1alpha1.KubernetesProxyConfig) {
+	floatingUserId := dstKube.GetFloatingUserId()
+	if floatingUserId == nil || !*floatingUserId {
+		return
+	}
+
+	// Pod security context
+	podSecurityContext := dstKube.GetPodTemplate().GetSecurityContext()
+	if podSecurityContext != nil {
+		podSecurityContext.RunAsUser = nil
+	}
+
+	// Container security contexts
+	securityContexts := []*corev1.SecurityContext{
+		dstKube.GetEnvoyContainer().GetSecurityContext(),
+		dstKube.GetSdsContainer().GetSecurityContext(),
+		dstKube.GetIstio().GetIstioProxyContainer().GetSecurityContext(),
+		dstKube.GetAiExtension().GetSecurityContext(),
+	}
+
+	for _, securityContext := range securityContexts {
+		if securityContext != nil {
+			securityContext.RunAsUser = nil
+		}
+	}
+}
+
 // getInMemoryGatewayParameters returns an in-memory GatewayParameters based on the name of the gateway class.
 func GetInMemoryGatewayParameters(name string, imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
 	switch name {
