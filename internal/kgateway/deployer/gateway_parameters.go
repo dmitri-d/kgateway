@@ -24,6 +24,8 @@ type HelmValuesGenerator interface {
 }
 
 type ExtraGatewayParameters struct {
+	Group     string
+	Kind      string
 	Object    client.Object
 	Generator HelmValuesGenerator
 }
@@ -50,8 +52,8 @@ type kGatewayParameters struct {
 func (gp *GatewayParameters) WithExtraGatewayParameters(params ...ExtraGatewayParameters) *GatewayParameters {
 	for _, p := range params {
 		gp.knownGWParameters = append(gp.knownGWParameters, p.Object)
-		group := p.Object.GetObjectKind().GroupVersionKind().Group
-		kind := p.Object.GetObjectKind().GroupVersionKind().Kind
+		group := p.Group
+		kind := p.Kind
 		gp.extraHVGenerators[schema.GroupKind{Group: group, Kind: kind}] = p.Generator
 	}
 	return gp
