@@ -6,10 +6,11 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/helm"
-	"github.com/kgateway-dev/kgateway/v2/internal/version"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/helm"
+	"github.com/kgateway-dev/kgateway/v2/internal/version"
 )
 
 func LoadKgatewayChart() (*chart.Chart, error) {

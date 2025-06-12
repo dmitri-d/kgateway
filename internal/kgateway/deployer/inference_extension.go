@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+
+	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 )
 
 type InferenceExtension struct{}
