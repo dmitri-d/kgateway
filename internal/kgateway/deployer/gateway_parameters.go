@@ -39,9 +39,7 @@ type kGatewayParameters struct {
 func (gp *GatewayParameters) WithExtraGatewayParameters(params ...deployer.ExtraGatewayParameters) *GatewayParameters {
 	for _, p := range params {
 		gp.knownGWParameters = append(gp.knownGWParameters, p.Object)
-		group := p.Object.GetObjectKind().GroupVersionKind().Group
-		kind := p.Object.GetObjectKind().GroupVersionKind().Kind
-		gp.extraHVGenerators[schema.GroupKind{Group: group, Kind: kind}] = p.Generator
+		gp.extraHVGenerators[schema.GroupKind{Group: p.Group, Kind: p.Kind}] = p.Generator
 	}
 	return gp
 }

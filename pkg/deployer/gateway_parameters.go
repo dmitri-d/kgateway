@@ -18,6 +18,8 @@ type HelmValuesGenerator interface {
 }
 
 type ExtraGatewayParameters struct {
+	Group     string
+	Kind      string
 	Object    client.Object
 	Generator HelmValuesGenerator
 }
