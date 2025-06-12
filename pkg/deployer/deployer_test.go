@@ -249,7 +249,7 @@ var _ = Describe("Deployer", func() {
 						},
 						Stats: &gw2_v1alpha1.StatsConfig{
 							Enabled:                 ptr.To(true),
-							RoutePrefixRewrite:      ptr.To("/stats/prometheus"),
+							RoutePrefixRewrite:      ptr.To("/stats/prometheus?usedonly"),
 							EnableStatsRoute:        ptr.To(true),
 							StatsRoutePrefixRewrite: ptr.To("/stats"),
 						},

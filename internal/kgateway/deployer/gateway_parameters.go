@@ -238,6 +238,9 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 		Namespace: gw.GetNamespace(),
 	}
 	irGW := d.inputs.CommonCollections.GatewayIndex.Gateways.GetKey(gwKey.ResourceName())
+	if irGW == nil {
+		irGW = gatewayFrom(gw)
+	}
 
 	// construct the default values
 	vals := &deployer.HelmConfig{
@@ -356,4 +359,25 @@ func getGatewayClassFromGateway(ctx context.Context, cli client.Client, gw *api.
 	}
 
 	return gwc, nil
+}
+
+func gatewayFrom(gw *api.Gateway) *ir.Gateway {
+	out := &ir.Gateway{
+		ObjectSource: ir.ObjectSource{
+			Group:     api.SchemeGroupVersion.Group,
+			Kind:      wellknown.GatewayKind,
+			Namespace: gw.Namespace,
+			Name:      gw.Name,
+		},
+		Obj:       gw,
+		Listeners: make([]ir.Listener, 0, len(gw.Spec.Listeners)),
+	}
+
+	for _, l := range gw.Spec.Listeners {
+		out.Listeners = append(out.Listeners, ir.Listener{
+			Listener: l,
+			Parent:   gw,
+		})
+	}
+	return out
 }

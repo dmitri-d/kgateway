@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
@@ -58,6 +59,15 @@ type BackendConfigPolicySpec struct {
 	// Additional options when handling HTTP1 requests upstream.
 	// +optional
 	Http1ProtocolOptions *Http1ProtocolOptions `json:"http1ProtocolOptions,omitempty"`
+
+	// SSLConfig contains the options necessary to configure a backend to use TLS origination.
+	// See [Envoy documentation](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/tls.proto#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sslconfig) for more details.
+	// +optional
+	SSLConfig *SSLConfig `json:"sslConfig,omitempty"`
+
+	// LoadBalancerConfig contains the options necessary to configure the load balancer.
+	// +optional
+	LoadBalancerConfig *LoadBalancerConfig `json:"loadBalancerConfig,omitempty"`
 }
 
 // See [Envoy documentation](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/protocol.proto#envoy-v3-api-msg-config-core-v3-http1protocoloptions) for more details.
@@ -162,3 +172,220 @@ type TCPKeepalive struct {
 	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('1s')",message="keepAliveInterval must be at least 1 second"
 	KeepAliveInterval *metav1.Duration `json:"keepAliveInterval,omitempty"`
 }
+
+// +kubebuilder:validation:XValidation:rule="has(self.secretRef) != has(self.sslFiles)",message="Exactly one of secretRef or sslFiles must be set in SSLConfig"
+type SSLConfig struct {
+	// Reference to the TLS secret containing the certificate, key, and optionally the root CA.
+	// +optional
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+
+	// File paths to certificates local to the proxy.
+	// +optional
+	SSLFiles *SSLFiles `json:"sslFiles,omitempty"`
+
+	// The SNI domains that should be considered for TLS connection
+	// +optional
+	Sni string `json:"sni,omitempty"`
+
+	// Verify that the Subject Alternative Name in the peer certificate is one of the specified values.
+	// note that a root_ca must be provided if this option is used.
+	// +optional
+	VerifySubjectAltName []string `json:"verifySubjectAltName,omitempty"`
+
+	// General TLS parameters. See the [envoy docs](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#extensions-transport-sockets-tls-v3-tlsparameters)
+	// for more information on the meaning of these values.
+	// +optional
+	SSLParameters *SSLParameters `json:"sslParameters,omitempty"`
+
+	// Set Application Level Protocol Negotiation
+	// If empty, defaults to ["h2", "http/1.1"].
+	// +optional
+	AlpnProtocols []string `json:"alpnProtocols,omitempty"`
+
+	// Allow Tls renegotiation, the default value is false.
+	// TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
+	// +optional
+	AllowRenegotiation *bool `json:"allowRenegotiation,omitempty"`
+
+	// If the SSL config has the ca.crt (root CA) provided, kgateway uses it to perform mTLS by default.
+	// Set oneWayTls to true to disable mTLS in favor of server-only TLS (one-way TLS), even if kgateway has the root CA.
+	// If unset, defaults to false.
+	// +optional
+	OneWayTLS *bool `json:"oneWayTLS,omitempty"`
+}
+
+// TLSVersion defines the TLS version.
+// +kubebuilder:validation:Enum=AUTO;"1.0";"1.1";"1.2";"1.3"
+type TLSVersion string
+
+const (
+	TLSVersionAUTO TLSVersion = "AUTO"
+	TLSVersion1_0  TLSVersion = "1.0"
+	TLSVersion1_1  TLSVersion = "1.1"
+	TLSVersion1_2  TLSVersion = "1.2"
+	TLSVersion1_3  TLSVersion = "1.3"
+)
+
+type SSLParameters struct {
+	// Minimum TLS version.
+	// +optional
+	TLSMinVersion *TLSVersion `json:"tlsMinVersion,omitempty"`
+
+	// Maximum TLS version.
+	// +optional
+	TLSMaxVersion *TLSVersion `json:"tlsMaxVersion,omitempty"`
+
+	// +optional
+	CipherSuites []string `json:"cipherSuites,omitempty"`
+
+	// +optional
+	EcdhCurves []string `json:"ecdhCurves,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="has(self.tlsCertificate) || has(self.tlsKey) || has(self.rootCA)",message="At least one of tlsCertificate, tlsKey, or rootCA must be set in SSLFiles"
+type SSLFiles struct {
+	// +optional
+	TLSCertificate string `json:"tlsCertificate,omitempty"`
+
+	// +optional
+	TLSKey string `json:"tlsKey,omitempty"`
+
+	// +optional
+	RootCA string `json:"rootCA,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="[has(self.leastRequest), has(self.roundRobin), has(self.ringHash), has(self.maglev), has(self.random)].filter(x, x).size() <= 1",message="only one of leastRequest, roundRobin, ringHash, maglev, or random can be set"
+type LoadBalancerConfig struct {
+	// HealthyPanicThreshold configures envoy's panic threshold percentage between 0-100. Once the number of non-healthy hosts
+	// reaches this percentage, envoy disregards health information.
+	// See [Envoy documentation](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/panic_threshold.html).
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	HealthyPanicThreshold *uint32 `json:"healthyPanicThreshold,omitempty"`
+
+	// This allows batch updates of endpoints health/weight/metadata that happen during a time window.
+	// this help lower cpu usage when endpoint change rate is high. defaults to 1 second.
+	// Set to 0 to disable and have changes applied immediately.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s')",message="updateMergeWindow must be a valid duration string"
+	UpdateMergeWindow *metav1.Duration `json:"updateMergeWindow,omitempty"`
+
+	// LeastRequest configures the least request load balancer type.
+	// +optional
+	LeastRequest *LoadBalancerLeastRequestConfig `json:"leastRequest,omitempty"`
+
+	// RoundRobin configures the round robin load balancer type.
+	// +optional
+	RoundRobin *LoadBalancerRoundRobinConfig `json:"roundRobin,omitempty"`
+
+	// RingHash configures the ring hash load balancer type.
+	// +optional
+	RingHash *LoadBalancerRingHashConfig `json:"ringHash,omitempty"`
+
+	// Maglev configures the maglev load balancer type.
+	// +optional
+	Maglev *LoadBalancerMaglevConfig `json:"maglev,omitempty"`
+
+	// Random configures the random load balancer type.
+	// +optional
+	Random *LoadBalancerRandomConfig `json:"random,omitempty"`
+
+	// LocalityConfigType specifies the locality config type to use.
+	// See https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/load_balancing_policies/common/v3/common.proto#envoy-v3-api-msg-extensions-load-balancing-policies-common-v3-localitylbconfig
+	// +optional
+	// +kubebuilder:validation:Enum=WeightedLb
+	LocalityConfigType *LocalityConfigType `json:"localityConfigType,omitempty"`
+
+	// UseHostnameForHashing specifies whether to use the hostname instead of the resolved IP address for hashing.
+	// Defaults to false.
+	// +optional
+	// +default=false
+	UseHostnameForHashing bool `json:"useHostnameForHashing,omitempty"`
+
+	// If set to true, the load balancer will drain connections when the host set changes.
+	//
+	// Ring Hash or Maglev can be used to ensure that clients with the same key
+	// are routed to the same upstream host.
+	// Distruptions can cause new connections with the same key as existing connections
+	// to be routed to different hosts.
+	// Enabling this feature will cause the load balancer to drain existing connections
+	// when the host set changes, ensuring that new connections with the same key are
+	// consistently routed to the same host.
+	// Connections are not immediately closed, but are allowed to drain
+	// before being closed.
+	// +optional
+	CloseConnectionsOnHostSetChange *bool `json:"closeConnectionsOnHostSetChange,omitempty"`
+}
+
+// LoadBalancerLeastRequestConfig configures the least request load balancer type.
+type LoadBalancerLeastRequestConfig struct {
+	// How many choices to take into account.
+	// Defaults to 2.
+	// +optional
+	// +default=2
+	ChoiceCount uint32 `json:"choiceCount,omitempty"`
+
+	// SlowStartConfig configures the slow start configuration for the load balancer.
+	// +optional
+	SlowStartConfig *SlowStartConfig `json:"slowStartConfig,omitempty"`
+}
+
+// LoadBalancerRoundRobinConfig configures the round robin load balancer type.
+type LoadBalancerRoundRobinConfig struct {
+	// SlowStartConfig configures the slow start configuration for the load balancer.
+	// +optional
+	SlowStartConfig *SlowStartConfig `json:"slowStartConfig,omitempty"`
+}
+
+// LoadBalancerRingHashConfig configures the ring hash load balancer type.
+type LoadBalancerRingHashConfig struct {
+	// MinimumRingSize is the minimum size of the ring.
+	// +optional
+	MinimumRingSize *uint64 `json:"minimumRingSize,omitempty"`
+
+	// MaximumRingSize is the maximum size of the ring.
+	// +optional
+	MaximumRingSize *uint64 `json:"maximumRingSize,omitempty"`
+}
+
+type LoadBalancerMaglevConfig struct{}
+type LoadBalancerRandomConfig struct{}
+
+type SlowStartConfig struct {
+	// Represents the size of slow start window.
+	// If set, the newly created host remains in slow start mode starting from its creation time
+	// for the duration of slow start window.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s')",message="window must be a valid duration string"
+	Window *metav1.Duration `json:"window,omitempty"`
+
+	// This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
+	// so that endpoint would get linearly increasing amount of traffic.
+	// When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
+	// The value of aggression parameter should be greater than 0.0.
+	// By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
+	//
+	// During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
+	// `new_weight = weight * max(min_weight_percent, time_factor ^ (1 / aggression))`,
+	// where `time_factor=(time_since_start_seconds / slow_start_time_seconds)`.
+	//
+	// As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
+	// Once host exits slow start, time_factor and aggression no longer affect its weight.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == \"\" || (self.matches('^-?(?:[0-9]+(?:\\\\.[0-9]*)?|\\\\.[0-9]+)$') && double(self) > 0.0)",message="Aggression, if specified, must be a string representing a number greater than 0.0"
+	Aggression string `json:"aggression,omitempty"`
+
+	// Minimum weight percentage of an endpoint during slow start.
+	// +optional
+	MinWeightPercent *uint32 `json:"minWeightPercent,omitempty"`
+}
+
+type LocalityConfigType string
+
+const (
+	// https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/locality_weight#locality-weighted-load-balancing
+	// Locality weighted load balancing enables weighting assignments across different zones and geographical locations by using explicit weights.
+	// This field is required to enable locality weighted load balancing.
+	LocalityConfigTypeWeightedLb LocalityConfigType = "WeightedLb"
+)
