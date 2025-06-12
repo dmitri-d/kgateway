@@ -2026,7 +2026,8 @@ var _ = Describe("Deployer", func() {
 			ie := &internaldeployer.InferenceExtension{}
 			chart, err := controller.LoadInferenceExtensionChart()
 			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(pool), chart, &deployer.Inputs{
+			cli := newFakeClientWithObjs(pool)
+			d := deployer.NewDeployer(cli, chart, &deployer.Inputs{
 				CommonCollections:  newCommonCols(GinkgoT()),
 				ControllerName:     wellknown.GatewayControllerName,
 				InferenceExtension: &deployer.InferenceExtInfo{},
@@ -2039,7 +2040,7 @@ var _ = Describe("Deployer", func() {
 				internaldeployer.InferenceExtensionReleaseNameAndNamespace)
 
 			// Simulate reconciliation so that the pool gets its finalizer added.
-			err = d.EnsureFinalizer(context.Background(), pool)
+			err = controller.EnsureFinalizer(context.Background(), cli, pool)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Check that the pool itself has the finalizer set.

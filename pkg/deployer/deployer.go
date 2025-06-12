@@ -6,13 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"slices"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,7 +19,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 
@@ -63,7 +60,7 @@ type Deployer struct {
 	helmReleaseNameAndNamespaceGenerator func(obj client.Object) (string, string)
 }
 
-// NewDeployer creates a new gateway
+// NewDeployer creates a new gateway/inference pool/etc
 // TODO [danehans]: Reloading the chart for every reconciliation is inefficient.
 // See https://github.com/kgateway-dev/kgateway/issues/10672 for details.
 func NewDeployer(cli client.Client,
@@ -139,9 +136,9 @@ func (d *Deployer) Render(name, ns string, vals map[string]any) ([]client.Object
 
 // GetObjsToDeploy does the following:
 //
-// * performs GatewayParameters lookup/merging etc to get a final set of helm values
+// * uses HelmValuesGenerator to perform lookup/merging etc to get a final set of helm values
 //
-// * use those helm values to render the internal `kgateway` helm chart into k8s objects
+// * use those helm values to render the helm chart the deployer was instantiated with into k8s objects
 //
 // * sets ownerRefs on all generated objects
 //
@@ -175,6 +172,9 @@ func (d *Deployer) GetObjsToDeploy(ctx context.Context, obj client.Object) ([]cl
 			if renderedObj.GetNamespace() == "" {
 				renderedObj.SetNamespace(obj.GetNamespace())
 			}
+			// here we rely on client.Object interface to retrieve type metadata instead of using hard-coded values
+			// this works for resources retrieved using kube api,
+			// but these fields won't be set on newly instantiated objects
 			renderedObj.SetOwnerReferences([]metav1.OwnerReference{{
 				APIVersion: obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 				Kind:       obj.GetObjectKind().GroupVersionKind().Kind,
@@ -201,35 +201,6 @@ func (d *Deployer) DeployObjs(ctx context.Context, objs []client.Object) error {
 			return fmt.Errorf("failed to apply object %s %s: %w", obj.GetObjectKind().GroupVersionKind().String(), obj.GetName(), err)
 		}
 	}
-	return nil
-}
-
-// EnsureFinalizer adds the InferencePool finalizer to the given pool if it’s not already present.
-// The deployer requires InferencePools to be finalized to remove cluster-scoped resources.
-// This can be removed if the endpoint picker no longer requires cluster-scoped resources.
-// See: https://github.com/kubernetes-sigs/gateway-api-inference-extension/issues/224 for details.
-func (d *Deployer) EnsureFinalizer(ctx context.Context, pool *infextv1a2.InferencePool) error {
-	if slices.Contains(pool.Finalizers, wellknown.InferencePoolFinalizer) {
-		return nil
-	}
-	pool.Finalizers = append(pool.Finalizers, wellknown.InferencePoolFinalizer)
-	return d.cli.Update(ctx, pool)
-}
-
-// CleanupClusterScopedResources deletes the ClusterRoleBinding for the given pool.
-// TODO [danehans]: EPP should use role and rolebinding RBAC: https://github.com/kubernetes-sigs/gateway-api-inference-extension/issues/224
-func (d *Deployer) CleanupClusterScopedResources(ctx context.Context, pool *infextv1a2.InferencePool) error {
-	// The same release name as in the Helm template.
-	releaseName := fmt.Sprintf("%s-endpoint-picker", pool.Name)
-
-	// Delete the ClusterRoleBinding.
-	var crb rbacv1.ClusterRoleBinding
-	if err := d.cli.Get(ctx, client.ObjectKey{Name: releaseName}, &crb); err == nil {
-		if err := d.cli.Delete(ctx, &crb); err != nil {
-			return fmt.Errorf("failed to delete ClusterRoleBinding %s: %w", releaseName, err)
-		}
-	}
-
 	return nil
 }
 
