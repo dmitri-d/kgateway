@@ -1049,7 +1049,6 @@ var _ = Describe("Deployer", func() {
 
 		type expectedOutput struct {
 			getObjsErr     error
-			newDeployerErr error
 			validationFunc func(objs clientObjects, inp *input) error
 		}
 
