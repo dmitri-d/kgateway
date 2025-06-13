@@ -32,6 +32,12 @@ type Server interface {
 	Start(ctx context.Context) error
 }
 
+func WithGatewayControllerName(name func() string) func(*setup) {
+	return func(s *setup) {
+		s.gatewayControllerName = name()
+	}
+}
+
 func WithExtraPlugins(extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin) func(*setup) {
 	return func(s *setup) {
 		s.extraPlugins = extraPlugins
@@ -45,6 +51,7 @@ func ExtraGatewayParameters(extraGatewayParameters func(cli client.Client, input
 }
 
 type setup struct {
+	gatewayControllerName  string
 	extraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 }
@@ -52,7 +59,9 @@ type setup struct {
 var _ Server = &setup{}
 
 func New(opts ...func(*setup)) *setup {
-	s := &setup{}
+	s := &setup{
+		gatewayControllerName: wellknown.GatewayControllerName,
+	}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -60,11 +69,12 @@ func New(opts ...func(*setup)) *setup {
 }
 
 func (s *setup) Start(ctx context.Context) error {
-	return StartKgateway(ctx, s.extraPlugins, s.extraGatewayParameters)
+	return StartKgateway(ctx, s.gatewayControllerName, s.extraPlugins, s.extraGatewayParameters)
 }
 
 func StartKgateway(
 	ctx context.Context,
+	gatewayControllerName string,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 ) error {
@@ -93,7 +103,7 @@ func StartKgateway(
 	}
 
 	restConfig := ctrl.GetConfigOrDie()
-	return StartKgatewayWithConfig(ctx, setupOpts, restConfig, uccBuilder, extraPlugins, extraGatewayParameters)
+	return StartKgatewayWithConfig(ctx, gatewayControllerName, setupOpts, restConfig, uccBuilder, extraPlugins, extraGatewayParameters)
 }
 
 func startControlPlane(
@@ -106,6 +116,7 @@ func startControlPlane(
 
 func StartKgatewayWithConfig(
 	ctx context.Context,
+	gatewayControllerName string,
 	setupOpts *controller.SetupOpts,
 	restConfig *rest.Config,
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
@@ -132,8 +143,7 @@ func StartKgatewayWithConfig(
 
 	slog.Info("initializing controller")
 	c, err := controller.NewControllerBuilder(ctx, controller.StartConfig{
-		// TODO: why do we plumb this through if it's wellknown?
-		ControllerName:         wellknown.GatewayControllerName,
+		ControllerName:         gatewayControllerName,
 		ExtraPlugins:           extraPlugins,
 		ExtraGatewayParameters: extraGatewayParameters,
 		RestConfig:             restConfig,

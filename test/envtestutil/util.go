@@ -30,6 +30,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/settings"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/setup"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 )
@@ -116,7 +117,7 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		setup.StartKgatewayWithConfig(ctx, setupOpts, cfg, builder, extraPlugins, extraGatewayParameters)
+		setup.StartKgatewayWithConfig(ctx, wellknown.GatewayControllerName, setupOpts, cfg, builder, extraPlugins, extraGatewayParameters)
 	}()
 	// give kgateway time to initialize so we don't get
 	// "kgateway not initialized" error
