@@ -2,6 +2,7 @@ package setup
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	istiokube "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,10 +52,17 @@ func ExtraGatewayParameters(extraGatewayParameters func(cli client.Client, input
 	}
 }
 
+func AddToScheme(addToScheme func(s *runtime.Scheme) error) func(s *setup) {
+	return func(s *setup) {
+		s.addToScheme = addToScheme
+	}
+}
+
 type setup struct {
 	gatewayControllerName  string
 	extraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
+	addToScheme            func(s *runtime.Scheme) error
 }
 
 var _ Server = &setup{}
@@ -69,7 +78,7 @@ func New(opts ...func(*setup)) *setup {
 }
 
 func (s *setup) Start(ctx context.Context) error {
-	return StartKgateway(ctx, s.gatewayControllerName, s.extraPlugins, s.extraGatewayParameters)
+	return StartKgateway(ctx, s.gatewayControllerName, s.extraPlugins, s.extraGatewayParameters, s.addToScheme)
 }
 
 func StartKgateway(
@@ -77,6 +86,7 @@ func StartKgateway(
 	gatewayControllerName string,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
+	addToScheme func(s *runtime.Scheme) error,
 ) error {
 	// load global settings
 	st, err := settings.BuildSettings()
@@ -103,7 +113,16 @@ func StartKgateway(
 	}
 
 	restConfig := ctrl.GetConfigOrDie()
-	return StartKgatewayWithConfig(ctx, gatewayControllerName, setupOpts, restConfig, uccBuilder, extraPlugins, extraGatewayParameters)
+	return StartKgatewayWithConfig(
+		ctx,
+		gatewayControllerName,
+		setupOpts,
+		restConfig,
+		uccBuilder,
+		extraPlugins,
+		extraGatewayParameters,
+		addToScheme,
+	)
 }
 
 func startControlPlane(
@@ -122,8 +141,9 @@ func StartKgatewayWithConfig(
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
+	addToScheme func(s *runtime.Scheme) error,
 ) error {
-	slog.Info("starting kgateway")
+	slog.Info(fmt.Sprintf("starting kgateway: %s", gatewayControllerName))
 
 	kubeClient, err := CreateKubeClient(restConfig)
 	if err != nil {
@@ -146,6 +166,7 @@ func StartKgatewayWithConfig(
 		ControllerName:         gatewayControllerName,
 		ExtraPlugins:           extraPlugins,
 		ExtraGatewayParameters: extraGatewayParameters,
+		AddToScheme:            addToScheme,
 		RestConfig:             restConfig,
 		SetupOpts:              setupOpts,
 		Client:                 kubeClient,

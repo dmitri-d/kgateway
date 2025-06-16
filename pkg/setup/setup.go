@@ -3,6 +3,7 @@ package setup
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	core "github.com/kgateway-dev/kgateway/v2/internal/kgateway/setup"
@@ -15,9 +16,15 @@ type Options struct {
 	GatewayControllerName  func() string
 	ExtraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
 	ExtraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
+	AddToScheme            func(s *runtime.Scheme) error
 }
 
 func New(opts Options) core.Server {
 	// internal setup already accepted functional-options; we wrap only extras.
-	return core.New(core.WithExtraPlugins(opts.ExtraPlugins), core.ExtraGatewayParameters(opts.ExtraGatewayParameters))
+	return core.New(
+		core.WithExtraPlugins(opts.ExtraPlugins),
+		core.ExtraGatewayParameters(opts.ExtraGatewayParameters),
+		core.WithGatewayControllerName(opts.GatewayControllerName),
+		core.AddToScheme(opts.AddToScheme),
+	)
 }
