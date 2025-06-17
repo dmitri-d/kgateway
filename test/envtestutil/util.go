@@ -117,7 +117,7 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		setup.StartKgatewayWithConfig(ctx, wellknown.GatewayControllerName, setupOpts, cfg, builder, extraPlugins, extraGatewayParameters)
+		setup.StartKgatewayWithConfig(ctx, wellknown.GatewayControllerName, setupOpts, cfg, builder, extraPlugins, extraGatewayParameters, nil)
 	}()
 	// give kgateway time to initialize so we don't get
 	// "kgateway not initialized" error
