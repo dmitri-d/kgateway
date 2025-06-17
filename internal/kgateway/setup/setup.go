@@ -2,7 +2,6 @@ package setup
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 
@@ -143,7 +142,7 @@ func StartKgatewayWithConfig(
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 	addToScheme func(s *runtime.Scheme) error,
 ) error {
-	slog.Info(fmt.Sprintf("starting kgateway: %s", gatewayControllerName))
+	slog.Info("starting kgateway")
 
 	kubeClient, err := CreateKubeClient(restConfig)
 	if err != nil {
