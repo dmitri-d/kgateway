@@ -364,7 +364,7 @@ func NewGatewayIndex(
 				})
 			}
 
-			allowedNs, err := allowedListenerSet(i, ls, namespaces)
+			allowedNs, err := allowedListenerSet(i, namespaces)
 			if err != nil {
 				out.DeniedListenerSets = append(out.DeniedListenerSets, lsIR)
 				continue
@@ -386,7 +386,7 @@ func NewGatewayIndex(
 	return h
 }
 
-func allowedListenerSet(gw *gwv1.Gateway, listenerSet *gwxv1a1.XListenerSet, namespaces krt.Collection[NamespaceMetadata]) (func(kctx krt.HandlerContext, namespace string) bool, error) {
+func allowedListenerSet(gw *gwv1.Gateway, namespaces krt.Collection[NamespaceMetadata]) (func(kctx krt.HandlerContext, namespace string) bool, error) {
 	// Default to None. Ref: https://gateway-api.sigs.k8s.io/geps/gep-1713/#gateway-listenerset-handshake
 	allowedNs := NoNamespace()
 
@@ -950,6 +950,17 @@ func (h *RoutesIndex) FetchHttp(kctx krt.HandlerContext, ns, n string) *ir.HttpR
 	return route
 }
 
+// ListHTTPRoutesInNamespace returns all HTTPRouteIRs in the given namespace.
+func (h *RoutesIndex) ListHTTPRoutesInNamespace(ns string) []ir.HttpRouteIR {
+	var out []ir.HttpRouteIR
+	for _, rt := range h.httpRoutes.List() {
+		if rt.GetNamespace() == ns {
+			out = append(out, rt)
+		}
+	}
+	return out
+}
+
 func (h *RoutesIndex) Fetch(kctx krt.HandlerContext, gk schema.GroupKind, ns, n string) *RouteWrapper {
 	src := ir.ObjectSource{
 		Group:     gk.Group,
@@ -1099,7 +1110,7 @@ func (h *RoutesIndex) resolveExtension(kctx krt.HandlerContext, ns string, ext g
 		}
 		policy := h.policies.fetchPolicy(kctx, key)
 		if policy == nil {
-			return schema.GroupKind{}, nil, []error{ErrPolicyNotFound}
+			return schema.GroupKind{}, nil, []error{fmt.Errorf("%s: %w", key, ErrPolicyNotFound)}
 		}
 
 		gk := schema.GroupKind{
@@ -1221,10 +1232,11 @@ func toAttachedPolicies(policies []ir.PolicyAtt, opts ...ir.PolicyAttachmentOpts
 		// Create a new PolicyAtt instead of using `p` because the PolicyAttchmentOpts are per-route
 		// and not encoded in `p`
 		polAtt := ir.PolicyAtt{
-			PolicyIr:  p.PolicyIr,
-			PolicyRef: p.PolicyRef,
-			GroupKind: gk,
-			Errors:    p.Errors,
+			PolicyIr:   p.PolicyIr,
+			PolicyRef:  p.PolicyRef,
+			GroupKind:  gk,
+			Errors:     p.Errors,
+			Generation: p.Generation,
 		}
 		for _, o := range opts {
 			o(&polAtt)
