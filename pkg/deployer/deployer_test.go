@@ -348,12 +348,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwp := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwParams))
-			chart, err := controller.LoadKgatewayChart()
-			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(gwc, gwParams), chart, &deployer.Inputs{
+			gwp := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwParams), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
-				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
 				ControlPlane: deployer.ControlPlaneInfo{
 					XdsHost: "something.cluster.local",
@@ -363,7 +359,10 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			},
+			})
+			chart, err := controller.LoadKgatewayChart()
+			Expect(err).NotTo(HaveOccurred())
+			d := deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, gwParams), chart,
 				gwp,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -424,12 +423,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 			var err error
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-			chart, err := controller.LoadKgatewayChart()
-			Expect(err).NotTo(HaveOccurred())
-			d = deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), chart, &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
-				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
 				ControlPlane: deployer.ControlPlaneInfo{
 					XdsHost: "something.cluster.local",
@@ -439,7 +434,10 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			},
+			})
+			chart, err := controller.LoadKgatewayChart()
+			Expect(err).NotTo(HaveOccurred())
+			d = deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, gwp), chart,
 				gwParams,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -493,12 +491,8 @@ var _ = Describe("Deployer", func() {
 					}},
 				},
 			}
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-			chart, err := controller.LoadKgatewayChart()
-			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), chart, &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
-				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
 				ControlPlane: deployer.ControlPlaneInfo{
 					XdsHost: "something.cluster.local",
@@ -508,7 +502,10 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			},
+			})
+			chart, err := controller.LoadKgatewayChart()
+			Expect(err).NotTo(HaveOccurred())
+			d := deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, gwp), chart,
 				gwParams,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -608,12 +605,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams1 := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()))
-			chart, err := controller.LoadKgatewayChart()
-			Expect(err).NotTo(HaveOccurred())
-			d1 := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGatewayParams()), chart, &deployer.Inputs{
+			gwParams1 := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw1, gw2),
-				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
 				ControlPlane: deployer.ControlPlaneInfo{
 					XdsHost: "something.cluster.local",
@@ -623,14 +616,16 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			},
+			})
+			chart, err := controller.LoadKgatewayChart()
+			Expect(err).NotTo(HaveOccurred())
+			d1 := deployer.NewDeployer(wellknown.GatewayControllerName,
+				newFakeClientWithObjs(gwc, defaultGatewayParams()), chart,
 				gwParams1,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
-			gwParams2 := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()))
-			d2 := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGatewayParams()), chart, &deployer.Inputs{
+			gwParams2 := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGatewayParams()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), gwc, gw1, gw2),
-				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
 				ControlPlane: deployer.ControlPlaneInfo{
 					XdsHost: "something.cluster.local",
@@ -640,7 +635,8 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			},
+			})
+			d2 := deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, defaultGatewayParams()), chart,
 				gwParams2,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -689,12 +685,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()))
-			chart, err := controller.LoadKgatewayChart()
-			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass()), chart, &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), defaultGatewayClass(), gw),
-				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
 				ControlPlane: deployer.ControlPlaneInfo{
 					XdsHost: "something.cluster.local",
@@ -704,7 +696,11 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			},
+			})
+			chart, err := controller.LoadKgatewayChart()
+			Expect(err).NotTo(HaveOccurred())
+			d := deployer.NewDeployer(wellknown.GatewayControllerName,
+				newFakeClientWithObjs(defaultGatewayClass()), chart,
 				gwParams,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -731,12 +727,8 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()))
-			chart, err := controller.LoadKgatewayChart()
-			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass()), chart, &deployer.Inputs{
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass()), &deployer.Inputs{
 				CommonCollections: newCommonCols(GinkgoT(), defaultGatewayClass(), gw),
-				ControllerName:    wellknown.GatewayControllerName,
 				Dev:               false,
 				ControlPlane: deployer.ControlPlaneInfo{
 					XdsHost: "something.cluster.local",
@@ -746,7 +738,12 @@ var _ = Describe("Deployer", func() {
 					Registry: "foo",
 					Tag:      "bar",
 				},
-			},
+			})
+			chart, err := controller.LoadKgatewayChart()
+			Expect(err).NotTo(HaveOccurred())
+			d := deployer.NewDeployer(
+				wellknown.GatewayControllerName,
+				newFakeClientWithObjs(defaultGatewayClass()), chart,
 				gwParams,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 			Expect(err).NotTo(HaveOccurred())
@@ -793,12 +790,8 @@ var _ = Describe("Deployer", func() {
 					},
 				}
 
-				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc))
-				chart, err := controller.LoadKgatewayChart()
-				Expect(err).NotTo(HaveOccurred())
-				d = deployer.NewDeployer(newFakeClientWithObjs(gwc), chart, &deployer.Inputs{
+				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc), &deployer.Inputs{
 					CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
-					ControllerName:    wellknown.GatewayControllerName,
 					Dev:               false,
 					ControlPlane: deployer.ControlPlaneInfo{
 						XdsHost: "something.cluster.local",
@@ -808,7 +801,12 @@ var _ = Describe("Deployer", func() {
 						Registry: registry,
 						Tag:      tag,
 					},
-				},
+				})
+				chart, err := controller.LoadKgatewayChart()
+				Expect(err).NotTo(HaveOccurred())
+				d = deployer.NewDeployer(
+					wellknown.GatewayControllerName,
+					newFakeClientWithObjs(gwc), chart,
 					gwParams,
 					internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -881,12 +879,8 @@ var _ = Describe("Deployer", func() {
 					},
 				}
 				gwc := defaultGatewayClass()
-				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-				chart, err := controller.LoadKgatewayChart()
-				Expect(err).NotTo(HaveOccurred())
-				d = deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), chart, &deployer.Inputs{
+				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 					CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
-					ControllerName:    wellknown.GatewayControllerName,
 					Dev:               false,
 					ControlPlane: deployer.ControlPlaneInfo{
 						XdsHost: "something.cluster.local",
@@ -896,7 +890,12 @@ var _ = Describe("Deployer", func() {
 						Registry: registry,
 						Tag:      tag,
 					},
-				},
+				})
+				chart, err := controller.LoadKgatewayChart()
+				Expect(err).NotTo(HaveOccurred())
+				d = deployer.NewDeployer(
+					wellknown.GatewayControllerName,
+					newFakeClientWithObjs(gwc, gwp), chart,
 					gwParams,
 					internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -977,12 +976,8 @@ var _ = Describe("Deployer", func() {
 						}},
 					},
 				}
-				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp))
-				chart, err := controller.LoadKgatewayChart()
-				Expect(err).NotTo(HaveOccurred())
-				d = deployer.NewDeployer(newFakeClientWithObjs(gwc, gwp), chart, &deployer.Inputs{
+				gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, gwp), &deployer.Inputs{
 					CommonCollections: newCommonCols(GinkgoT(), gwc, gw),
-					ControllerName:    wellknown.GatewayControllerName,
 					Dev:               false,
 					ControlPlane: deployer.ControlPlaneInfo{
 						XdsHost: "something.cluster.local",
@@ -992,7 +987,12 @@ var _ = Describe("Deployer", func() {
 						Registry: registry,
 						Tag:      tag,
 					},
-				},
+				})
+				chart, err := controller.LoadKgatewayChart()
+				Expect(err).NotTo(HaveOccurred())
+				d = deployer.NewDeployer(
+					wellknown.GatewayControllerName,
+					newFakeClientWithObjs(gwc, gwp), chart,
 					gwParams,
 					internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -1298,8 +1298,7 @@ var _ = Describe("Deployer", func() {
 			}
 			defaultDeployerInputs = func() *deployer.Inputs {
 				return &deployer.Inputs{
-					ControllerName: wellknown.GatewayControllerName,
-					Dev:            false,
+					Dev: false,
 					ControlPlane: deployer.ControlPlaneInfo{
 						XdsHost: "something.cluster.local", XdsPort: 1234,
 					},
@@ -1699,10 +1698,10 @@ var _ = Describe("Deployer", func() {
 				overrideGwp = &gw2_v1alpha1.GatewayParameters{}
 			}
 
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp))
+			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), inp.dInputs)
 			chart, err := controller.LoadKgatewayChart()
 			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), chart, inp.dInputs,
+			d := deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), chart,
 				gwParams,
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
@@ -2026,15 +2025,7 @@ var _ = Describe("Deployer", func() {
 			chart, err := controller.LoadInferenceExtensionChart()
 			Expect(err).NotTo(HaveOccurred())
 			cli := newFakeClientWithObjs(pool)
-			d := deployer.NewDeployer(cli, chart, &deployer.Inputs{
-				CommonCollections:  newCommonCols(GinkgoT()),
-				ControllerName:     wellknown.GatewayControllerName,
-				InferenceExtension: &deployer.InferenceExtInfo{},
-				ImageInfo: &deployer.ImageInfo{
-					Registry: "foo",
-					Tag:      "bar",
-				},
-			},
+			d := deployer.NewDeployer(wellknown.GatewayControllerName, cli, chart,
 				ie,
 				internaldeployer.InferenceExtensionReleaseNameAndNamespace)
 
@@ -2167,21 +2158,24 @@ var _ = Describe("Deployer", func() {
 				},
 			}
 
-			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()))
+			gwParams := internaldeployer.NewGatewayParameters(
+				newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()), &deployer.Inputs{
+					CommonCollections: newCommonCols(GinkgoT(), defaultGatewayClass(), gw, ls),
+					Dev:               false,
+					ControlPlane: deployer.ControlPlaneInfo{
+						XdsHost: "something.cluster.local", XdsPort: 1234,
+					},
+					ImageInfo: &deployer.ImageInfo{
+						Registry: "foo",
+						Tag:      "bar",
+					},
+				})
 			chart, err := controller.LoadKgatewayChart()
 			Expect(err).NotTo(HaveOccurred())
-			d := deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()), chart, &deployer.Inputs{
-				CommonCollections: newCommonCols(GinkgoT(), defaultGatewayClass(), gw, ls),
-				ControllerName:    wellknown.GatewayControllerName,
-				Dev:               false,
-				ControlPlane: deployer.ControlPlaneInfo{
-					XdsHost: "something.cluster.local", XdsPort: 1234,
-				},
-				ImageInfo: &deployer.ImageInfo{
-					Registry: "foo",
-					Tag:      "bar",
-				},
-			}, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
+			d := deployer.NewDeployer(
+				wellknown.GatewayControllerName,
+				newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()),
+				chart, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
 
 			var objs clientObjects
 			objs, err = d.GetObjsToDeploy(context.Background(), gw)

@@ -16,9 +16,10 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 )
 
-func NewGatewayParameters(cli client.Client) *GatewayParameters {
+func NewGatewayParameters(cli client.Client, inputs *deployer.Inputs) *GatewayParameters {
 	return &GatewayParameters{
 		cli:               cli,
+		inputs:            inputs,
 		knownGWParameters: []client.Object{&v1alpha1.GatewayParameters{}}, // always include default GatewayParameters
 		extraHVGenerators: make(map[schema.GroupKind]deployer.HelmValuesGenerator),
 	}
@@ -26,6 +27,7 @@ func NewGatewayParameters(cli client.Client) *GatewayParameters {
 
 type GatewayParameters struct {
 	cli               client.Client
+	inputs            *deployer.Inputs
 	extraHVGenerators map[schema.GroupKind]deployer.HelmValuesGenerator
 	knownGWParameters []client.Object
 }
@@ -47,7 +49,7 @@ func (gp *GatewayParameters) AllKnownGatewayParameters() []client.Object {
 	return slices.Clone(gp.knownGWParameters)
 }
 
-func (gp *GatewayParameters) GetValues(ctx context.Context, obj client.Object, inputs *deployer.Inputs) (map[string]any, error) {
+func (gp *GatewayParameters) GetValues(ctx context.Context, obj client.Object) (map[string]any, error) {
 	logger := log.FromContext(ctx)
 
 	gw, ok := obj.(*api.Gateway)
@@ -61,14 +63,14 @@ func (gp *GatewayParameters) GetValues(ctx context.Context, obj client.Object, i
 	}
 
 	if g, ok := gp.extraHVGenerators[ref]; ok {
-		return g.GetValues(ctx, gw, inputs)
+		return g.GetValues(ctx, gw)
 	}
 	logger.V(1).Info("using default GatewayParameters for Gateway",
 		"gatewayName", gw.GetName(),
 		"gatewayNamespace", gw.GetNamespace(),
 	)
 
-	return newKGatewayParameters(gp.cli, inputs).GetValues(ctx, gw)
+	return newKGatewayParameters(gp.cli, gp.inputs).GetValues(ctx, gw)
 }
 
 func GatewayReleaseNameAndNamespace(obj client.Object) (string, string) {

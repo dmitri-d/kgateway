@@ -11,10 +11,20 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 )
 
 type HelmValuesGenerator interface {
-	GetValues(ctx context.Context, obj client.Object, inputs *Inputs) (map[string]any, error)
+	GetValues(ctx context.Context, obj client.Object) (map[string]any, error)
+}
+
+// Inputs is the set of options used to configure gateway/ineference pool deployment.
+type Inputs struct {
+	Dev                  bool
+	IstioAutoMtlsEnabled bool
+	ControlPlane         ControlPlaneInfo
+	ImageInfo            *ImageInfo
+	CommonCollections    *common.CommonCollections
 }
 
 type ExtraGatewayParameters struct {

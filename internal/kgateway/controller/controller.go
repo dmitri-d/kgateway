@@ -184,14 +184,13 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 
 	log.Info("creating gateway deployer", "ctrlname", c.cfg.ControllerName, "server", c.cfg.ControlPlane.XdsHost, "port", c.cfg.ControlPlane.XdsPort)
 	inputs := &deployer.Inputs{
-		ControllerName:       c.cfg.ControllerName,
 		Dev:                  c.cfg.Dev,
 		IstioAutoMtlsEnabled: c.cfg.IstioAutoMtlsEnabled,
 		ControlPlane:         c.cfg.ControlPlane,
 		ImageInfo:            c.cfg.ImageInfo,
 		CommonCollections:    c.cfg.CommonCollections,
 	}
-	gwParams := internaldeployer.NewGatewayParameters(c.cfg.Mgr.GetClient())
+	gwParams := internaldeployer.NewGatewayParameters(c.cfg.Mgr.GetClient(), inputs)
 	if c.extraGatewayParameters != nil {
 		gwParams.WithExtraGatewayParameters(c.extraGatewayParameters(c.cfg.Mgr.GetClient(), inputs)...)
 	}
@@ -200,7 +199,7 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 		return err
 	}
 	d := deployer.NewDeployer(
-		c.cfg.Mgr.GetClient(), chart, inputs, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
+		c.cfg.ControllerName, c.cfg.Mgr.GetClient(), chart, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
 	gvks, err := c.getGvksToWatch(ctx, d, map[string]any{
 		"gateway": map[string]any{
 			"istio": map[string]any{
@@ -430,19 +429,13 @@ func (c *controllerBuilder) watchInferencePool(ctx context.Context) error {
 
 	// If enabled, create a deployer using the controllerBuilder as inputs.
 	if c.poolCfg.InferenceExt != nil {
-		inputs := &deployer.Inputs{
-			ControllerName:     c.cfg.ControllerName,
-			ImageInfo:          c.cfg.ImageInfo,
-			InferenceExtension: c.poolCfg.InferenceExt,
-			CommonCollections:  c.cfg.CommonCollections,
-		}
 		inferenceExt := &internaldeployer.InferenceExtension{}
 		chart, err := LoadInferenceExtensionChart()
 		if err != nil {
 			return err
 		}
 		d := deployer.NewDeployer(
-			c.cfg.Mgr.GetClient(), chart, inputs, inferenceExt,
+			c.cfg.ControllerName, c.cfg.Mgr.GetClient(), chart, inferenceExt,
 			internaldeployer.InferenceExtensionReleaseNameAndNamespace)
 		// Watch child objects, e.g. Deployments, created by the inference pool deployer.
 		gvks, err := c.getGvksToWatch(ctx, d, map[string]any{

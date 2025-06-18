@@ -12,7 +12,7 @@ import (
 
 type InferenceExtension struct{}
 
-func (ie *InferenceExtension) GetValues(_ context.Context, obj client.Object, _ *deployer.Inputs) (map[string]any, error) {
+func (ie *InferenceExtension) GetValues(_ context.Context, obj client.Object) (map[string]any, error) {
 	if obj == nil {
 		return nil, fmt.Errorf("inference pool is not defined for deployer")
 	}

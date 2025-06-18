@@ -21,8 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
-	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 )
 
 type ControlPlaneInfo struct {
@@ -33,17 +31,6 @@ type ControlPlaneInfo struct {
 // InferenceExtInfo defines the runtime state of Gateway API inference extensions.
 type InferenceExtInfo struct{}
 
-// Inputs is the set of options used to configure the deployer deployment.
-type Inputs struct {
-	ControllerName       string
-	Dev                  bool
-	IstioAutoMtlsEnabled bool
-	ControlPlane         ControlPlaneInfo
-	InferenceExtension   *InferenceExtInfo
-	ImageInfo            *ImageInfo
-	CommonCollections    *common.CommonCollections
-}
-
 type ImageInfo struct {
 	Registry   string
 	Tag        string
@@ -52,10 +39,9 @@ type ImageInfo struct {
 
 // A Deployer is responsible for deploying proxies and inference extensions.
 type Deployer struct {
-	chart *chart.Chart
-	cli   client.Client
-
-	inputs                               *Inputs
+	controllerName                       string
+	chart                                *chart.Chart
+	cli                                  client.Client
 	helmValues                           HelmValuesGenerator
 	helmReleaseNameAndNamespaceGenerator func(obj client.Object) (string, string)
 }
@@ -63,15 +49,15 @@ type Deployer struct {
 // NewDeployer creates a new gateway/inference pool/etc
 // TODO [danehans]: Reloading the chart for every reconciliation is inefficient.
 // See https://github.com/kgateway-dev/kgateway/issues/10672 for details.
-func NewDeployer(cli client.Client,
+func NewDeployer(controllerName string,
+	cli client.Client,
 	chart *chart.Chart,
-	inputs *Inputs,
 	hvg HelmValuesGenerator,
 	helmReleaseNameAndNamespaceGenerator func(obj client.Object) (string, string)) *Deployer {
 	return &Deployer{
+		controllerName:                       controllerName,
 		cli:                                  cli,
 		chart:                                chart,
-		inputs:                               inputs,
 		helmValues:                           hvg,
 		helmReleaseNameAndNamespaceGenerator: helmReleaseNameAndNamespaceGenerator,
 	}
@@ -117,19 +103,14 @@ func (d *Deployer) Render(name, ns string, vals map[string]any) ([]client.Object
 	install.ClientOnly = true
 	installCtx := context.Background()
 
-	chartType := "gateway"
-	if d.inputs.InferenceExtension != nil {
-		chartType = "inference extension"
-	}
-
 	release, err := install.RunWithContext(installCtx, d.chart, vals)
 	if err != nil {
-		return nil, fmt.Errorf("failed to render helm chart for %s %s.%s: %w", chartType, ns, name, err)
+		return nil, fmt.Errorf("failed to render helm chart for %s.%s: %w", ns, name, err)
 	}
 
 	objs, err := ConvertYAMLToObjects(d.cli.Scheme(), []byte(release.Manifest))
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert helm manifest yaml to objects for %s %s.%s: %w", chartType, ns, name, err)
+		return nil, fmt.Errorf("failed to convert helm manifest yaml to objects for %s.%s: %w", ns, name, err)
 	}
 	return objs, nil
 }
@@ -146,7 +127,7 @@ func (d *Deployer) Render(name, ns string, vals map[string]any) ([]client.Object
 func (d *Deployer) GetObjsToDeploy(ctx context.Context, obj client.Object) ([]client.Object, error) {
 	logger := log.FromContext(ctx)
 
-	vals, err := d.helmValues.GetValues(ctx, obj, d.inputs)
+	vals, err := d.helmValues.GetValues(ctx, obj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get helm values %s.%s: %w", obj.GetNamespace(), obj.GetName(), err)
 	}
@@ -197,7 +178,7 @@ func (d *Deployer) DeployObjs(ctx context.Context, objs []client.Object) error {
 	logger := log.FromContext(ctx)
 	for _, obj := range objs {
 		logger.V(1).Info("deploying object", "kind", obj.GetObjectKind(), "namespace", obj.GetNamespace(), "name", obj.GetName())
-		if err := d.cli.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(d.inputs.ControllerName)); err != nil {
+		if err := d.cli.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(d.controllerName)); err != nil {
 			return fmt.Errorf("failed to apply object %s %s: %w", obj.GetObjectKind().GroupVersionKind().String(), obj.GetName(), err)
 		}
 	}
