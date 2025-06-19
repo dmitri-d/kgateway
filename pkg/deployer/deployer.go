@@ -146,21 +146,26 @@ func (d *Deployer) GetObjsToDeploy(ctx context.Context, obj client.Object) ([]cl
 	if err != nil {
 		return nil, fmt.Errorf("failed to get objects to deploy %s.%s: %w", obj.GetNamespace(), obj.GetName(), err)
 	}
+
+	return objs, nil
+}
+
+func (d *Deployer) SetNamespaceAndOwner(owner client.Object, objs []client.Object) []client.Object {
 	// Ensure that each namespaced rendered object has its namespace and ownerRef set.
 	for _, renderedObj := range objs {
 		gvk := renderedObj.GetObjectKind().GroupVersionKind()
 		if IsNamespaced(gvk) {
 			if renderedObj.GetNamespace() == "" {
-				renderedObj.SetNamespace(obj.GetNamespace())
+				renderedObj.SetNamespace(owner.GetNamespace())
 			}
 			// here we rely on client.Object interface to retrieve type metadata instead of using hard-coded values
 			// this works for resources retrieved using kube api,
 			// but these fields won't be set on newly instantiated objects
 			renderedObj.SetOwnerReferences([]metav1.OwnerReference{{
-				APIVersion: obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
-				Kind:       obj.GetObjectKind().GroupVersionKind().Kind,
-				Name:       obj.GetName(),
-				UID:        obj.GetUID(),
+				APIVersion: owner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+				Kind:       owner.GetObjectKind().GroupVersionKind().Kind,
+				Name:       owner.GetName(),
+				UID:        owner.GetUID(),
 				Controller: ptr.To(true),
 			}})
 		} else {
@@ -171,7 +176,7 @@ func (d *Deployer) GetObjsToDeploy(ctx context.Context, obj client.Object) ([]cl
 		}
 	}
 
-	return objs, nil
+	return objs
 }
 
 func (d *Deployer) DeployObjs(ctx context.Context, objs []client.Object) error {

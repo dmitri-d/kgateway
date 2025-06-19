@@ -199,7 +199,8 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 		return err
 	}
 	d := deployer.NewDeployer(
-		c.cfg.ControllerName, c.cfg.Mgr.GetClient(), chart, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
+		c.cfg.ControllerName, c.cfg.Mgr.GetClient(), chart, gwParams,
+		func(obj client.Object) (string, string) { return "gloo-gateway-system", "ext-auth" })
 	gvks, err := c.getGvksToWatch(ctx, d, map[string]any{
 		"gateway": map[string]any{
 			"istio": map[string]any{

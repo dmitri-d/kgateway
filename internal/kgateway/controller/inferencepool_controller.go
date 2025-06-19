@@ -80,6 +80,7 @@ func (r *inferencePoolReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	objs = r.deployer.SetNamespaceAndOwner(pool, objs)
 
 	// TODO [danehans]: Manage inferencepool status conditions.
 

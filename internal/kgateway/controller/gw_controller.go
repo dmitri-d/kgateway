@@ -79,6 +79,7 @@ func (r *gatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if client.IgnoreNotFound(err) != nil {
 		return ctrl.Result{}, err
 	}
+	objs = r.deployer.SetNamespaceAndOwner(&gw, objs)
 
 	// find the name/ns of the service we own so we can grab addresses
 	// from it for status

@@ -369,6 +369,7 @@ var _ = Describe("Deployer", func() {
 			var objs clientObjects
 			objs, err = d.GetObjsToDeploy(context.Background(), gw)
 			Expect(err).NotTo(HaveOccurred())
+			objs = d.SetNamespaceAndOwner(gw, objs)
 			Expect(objs).To(HaveLen(4))
 			Expect(objs.findDeployment(defaultNamespace, gw.Name)).ToNot(BeNil())
 			Expect(objs.findService(defaultNamespace, gw.Name)).ToNot(BeNil())
@@ -442,7 +443,8 @@ var _ = Describe("Deployer", func() {
 				internaldeployer.GatewayReleaseNameAndNamespace)
 
 			objs, err := d.GetObjsToDeploy(context.Background(), gw)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+			objs = d.SetNamespaceAndOwner(gw, objs)
 			Expect(objs).To(BeEmpty())
 		})
 	})
@@ -511,7 +513,8 @@ var _ = Describe("Deployer", func() {
 
 			var objs clientObjects
 			objs, err = d.GetObjsToDeploy(context.Background(), gw)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+			objs = d.SetNamespaceAndOwner(gw, objs)
 			// check the image is using the agentgateway image
 			deployment := objs.findDeployment(defaultNamespace, "agent-gateway")
 			Expect(deployment).ToNot(BeNil())
@@ -643,13 +646,16 @@ var _ = Describe("Deployer", func() {
 			var objs1, objs2 clientObjects
 			objs1, err = d1.GetObjsToDeploy(context.Background(), gw1)
 			Expect(err).NotTo(HaveOccurred())
+			objs1 = d1.SetNamespaceAndOwner(gw1, objs1)
 			Expect(objs1).NotTo(BeEmpty())
 			Expect(objs1.findDeployment(defaultNamespace, gw1.Name)).ToNot(BeNil())
 			Expect(objs1.findService(defaultNamespace, gw1.Name)).ToNot(BeNil())
 			Expect(objs1.findConfigMap(defaultNamespace, gw1.Name)).ToNot(BeNil())
 			Expect(objs1.findServiceAccount(defaultNamespace, gw1.Name)).ToNot(BeNil())
+
 			objs2, err = d2.GetObjsToDeploy(context.Background(), gw2)
 			Expect(err).NotTo(HaveOccurred())
+			objs2 = d2.SetNamespaceAndOwner(gw2, objs2)
 			Expect(objs2).NotTo(BeEmpty())
 			Expect(objs2.findDeployment(defaultNamespace, gw2.Name)).ToNot(BeNil())
 			Expect(objs2.findService(defaultNamespace, gw2.Name)).ToNot(BeNil())
@@ -746,7 +752,6 @@ var _ = Describe("Deployer", func() {
 				newFakeClientWithObjs(defaultGatewayClass()), chart,
 				gwParams,
 				internaldeployer.GatewayReleaseNameAndNamespace)
-			Expect(err).NotTo(HaveOccurred())
 
 			_, err = d.GetObjsToDeploy(context.Background(), gw)
 			Expect(err).To(MatchError(ContainSubstring("invalid kind InvalidKind for GatewayParameters")))
@@ -812,6 +817,7 @@ var _ = Describe("Deployer", func() {
 
 				objs, err = d.GetObjsToDeploy(context.Background(), gw)
 				Expect(err).NotTo(HaveOccurred())
+				objs = d.SetNamespaceAndOwner(gw, objs)
 
 				By("validating the expected objects are deployed")
 				Expect(objs).NotTo(BeEmpty())
@@ -901,6 +907,7 @@ var _ = Describe("Deployer", func() {
 
 				objs, err = d.GetObjsToDeploy(context.Background(), gw)
 				Expect(err).NotTo(HaveOccurred())
+				objs = d.SetNamespaceAndOwner(gw, objs)
 
 				By("validating the expected objects are deployed")
 				Expect(objs).NotTo(BeEmpty())
@@ -998,6 +1005,7 @@ var _ = Describe("Deployer", func() {
 
 				objs, err = d.GetObjsToDeploy(context.Background(), gw)
 				Expect(err).NotTo(HaveOccurred())
+				objs = d.SetNamespaceAndOwner(gw, objs)
 
 				By("validating the expected objects are deployed")
 				Expect(objs).NotTo(BeEmpty())
@@ -1709,6 +1717,7 @@ var _ = Describe("Deployer", func() {
 			if checkErr(err, expected.getObjsErr) {
 				return
 			}
+			objs = d.SetNamespaceAndOwner(inp.gw, objs)
 
 			// handle custom test validation func
 			Expect(expected.validationFunc(objs, inp)).NotTo(HaveOccurred())
@@ -2039,6 +2048,8 @@ var _ = Describe("Deployer", func() {
 			// Get the endpoint picker objects for the InferencePool.
 			objs, err := d.GetObjsToDeploy(nil, pool)
 			Expect(err).NotTo(HaveOccurred())
+			objs = d.SetNamespaceAndOwner(pool, objs)
+
 			Expect(objs).NotTo(BeEmpty(), "expected non-empty objects for endpoint picker deployment")
 			Expect(objs).To(HaveLen(4))
 
@@ -2180,6 +2191,8 @@ var _ = Describe("Deployer", func() {
 			var objs clientObjects
 			objs, err = d.GetObjsToDeploy(context.Background(), gw)
 			Expect(err).NotTo(HaveOccurred())
+			objs = d.SetNamespaceAndOwner(gw, objs)
+
 			Expect(objs).To(HaveLen(4))
 			Expect(objs.findConfigMap(defaultNamespace, gw.Name)).ToNot(BeNil())
 			Expect(objs.findServiceAccount(defaultNamespace, gw.Name)).ToNot(BeNil())
