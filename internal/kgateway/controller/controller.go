@@ -76,7 +76,9 @@ type GatewayConfig struct {
 	CommonCollections *common.CommonCollections
 }
 
-func NewBaseGatewayController(ctx context.Context, cfg GatewayConfig, extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters) error {
+type ExtraGatewayParametersFunc func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
+
+func NewBaseGatewayController(ctx context.Context, cfg GatewayConfig, extraGatewayParameters ExtraGatewayParametersFunc) error {
 	log := log.FromContext(ctx)
 	log.V(5).Info("starting gateway controller", "controllerName", cfg.ControllerName)
 
