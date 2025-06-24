@@ -6,13 +6,6 @@ import (
 	"testing"
 	"time"
 
-	gw2_v1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
-	"github.com/kgateway-dev/kgateway/v2/pkg/schemes"
 	"github.com/stretchr/testify/assert"
 	"istio.io/istio/pkg/kube/krt/krttest"
 	"istio.io/istio/pkg/test"
@@ -25,6 +18,14 @@ import (
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	api "sigs.k8s.io/gateway-api/apis/v1"
 	apixv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
+
+	gw2_v1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
+	"github.com/kgateway-dev/kgateway/v2/pkg/schemes"
 )
 
 const (
