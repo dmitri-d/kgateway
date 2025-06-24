@@ -1037,7 +1037,7 @@ func schema_kgateway_v2_api_v1alpha1_AwsBackend(ref common.ReferenceCallback) co
 					},
 					"auth": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Auth specifies an explicit AWS authentication method for the backend. When omitted, the authentication method will be inferred from the environment (e.g. instance metadata, EKS Pod Identity, environment variables, etc.) This may not work in all environments, so it is recommended to specify an authentication method.\n\nSee the Envoy docs for more info: https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/aws_request_signing_filter#credentials",
+							Description: "Auth specifies an explicit AWS authentication method for the backend. When omitted, the following credential providers are tried in order, stopping when one of them returns an access key ID and a secret access key (the session token is optional): 1. Environment variables: when the environment variables AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN are set. 2. AssumeRoleWithWebIdentity API call: when the environment variables AWS_WEB_IDENTITY_TOKEN_FILE and AWS_ROLE_ARN are set. 3. EKS Pod Identity: when the environment variable AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE is set.\n\nSee the Envoy docs for more info: https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/aws_request_signing_filter#credentials",
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AwsAuth"),
 						},
 					},
@@ -1687,13 +1687,6 @@ func schema_kgateway_v2_api_v1alpha1_CommonHttpProtocolOptions(ref common.Refere
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
-					"headersWithUnderscoresAction": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Action to take when a client request with a header name containing underscore characters is received. If this setting is not specified, the value defaults to ALLOW. Note: upstream responses are not affected by this setting.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"maxRequestsPerConnection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Maximum requests for a single upstream connection. If set to 0 or unspecified, defaults to unlimited.",
@@ -2161,11 +2154,25 @@ func schema_kgateway_v2_api_v1alpha1_EnvoyContainer(ref common.ReferenceCallback
 							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
+					"env": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The container environment variables.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.EnvoyBootstrap", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Image", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.EnvoyBootstrap", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Image", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext"},
 	}
 }
 

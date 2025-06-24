@@ -573,6 +573,7 @@ func deepMergeEnvoyContainer(dst, src *v1alpha1.EnvoyContainer) *v1alpha1.EnvoyC
 	dst.Image = deepMergeImage(dst.GetImage(), src.GetImage())
 	dst.SecurityContext = deepMergeSecurityContext(dst.GetSecurityContext(), src.GetSecurityContext())
 	dst.Resources = DeepMergeResourceRequirements(dst.GetResources(), src.GetResources())
+	dst.Env = DeepMergeSlices(dst.GetEnv(), src.GetEnv())
 
 	return dst
 }

@@ -136,7 +136,7 @@ func (h *kGatewayParameters) GetValues(ctx context.Context, gw *api.Gateway) (ma
 
 // getGatewayParametersForGateway returns the merged GatewayParameters object resulting from the default GwParams object and
 // the GwParam object specifically associated with the given Gateway (if one exists).
-func (h *kGatewayParameters) getGatewayParametersForGateway(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
+func (k *kGatewayParameters) getGatewayParametersForGateway(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
 	logger := log.FromContext(ctx)
 
 	// attempt to get the GatewayParameters name from the Gateway. If we can't find it,
@@ -146,7 +146,7 @@ func (h *kGatewayParameters) getGatewayParametersForGateway(ctx context.Context,
 			"gatewayName", gw.GetName(),
 			"gatewayNamespace", gw.GetNamespace(),
 		)
-		return h.getDefaultGatewayParameters(ctx, gw)
+		return k.getDefaultGatewayParameters(ctx, gw)
 	}
 
 	gwpName := gw.Spec.Infrastructure.ParametersRef.Name
@@ -160,12 +160,12 @@ func (h *kGatewayParameters) getGatewayParametersForGateway(ctx context.Context,
 	// the GatewayParameters must live in the same namespace as the Gateway
 	gwpNamespace := gw.GetNamespace()
 	gwp := &v1alpha1.GatewayParameters{}
-	err := h.cli.Get(ctx, client.ObjectKey{Namespace: gwpNamespace, Name: gwpName}, gwp)
+	err := k.cli.Get(ctx, client.ObjectKey{Namespace: gwpNamespace, Name: gwpName}, gwp)
 	if err != nil {
 		return nil, deployer.GetGatewayParametersError(err, gwpNamespace, gwpName, gw.GetNamespace(), gw.GetName(), "Gateway")
 	}
 
-	defaultGwp, err := h.getDefaultGatewayParameters(ctx, gw)
+	defaultGwp, err := k.getDefaultGatewayParameters(ctx, gw)
 	if err != nil {
 		return nil, err
 	}
@@ -176,19 +176,19 @@ func (h *kGatewayParameters) getGatewayParametersForGateway(ctx context.Context,
 }
 
 // gets the default GatewayParameters associated with the GatewayClass of the provided Gateway
-func (h *kGatewayParameters) getDefaultGatewayParameters(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
-	gwc, err := getGatewayClassFromGateway(ctx, h.cli, gw)
+func (k *kGatewayParameters) getDefaultGatewayParameters(ctx context.Context, gw *api.Gateway) (*v1alpha1.GatewayParameters, error) {
+	gwc, err := getGatewayClassFromGateway(ctx, k.cli, gw)
 	if err != nil {
 		return nil, err
 	}
-	return h.getGatewayParametersForGatewayClass(ctx, gwc)
+	return k.getGatewayParametersForGatewayClass(ctx, gwc)
 }
 
 // Gets the GatewayParameters object associated with a given GatewayClass.
-func (h *kGatewayParameters) getGatewayParametersForGatewayClass(ctx context.Context, gwc *api.GatewayClass) (*v1alpha1.GatewayParameters, error) {
+func (k *kGatewayParameters) getGatewayParametersForGatewayClass(ctx context.Context, gwc *api.GatewayClass) (*v1alpha1.GatewayParameters, error) {
 	logger := log.FromContext(ctx)
 
-	defaultGwp := deployer.GetInMemoryGatewayParameters(gwc.GetName(), h.inputs.ImageInfo)
+	defaultGwp := deployer.GetInMemoryGatewayParameters(gwc.GetName(), k.inputs.ImageInfo)
 	paramRef := gwc.Spec.ParametersRef
 	if paramRef == nil {
 		// when there is no parametersRef, just return the defaults
@@ -211,7 +211,7 @@ func (h *kGatewayParameters) getGatewayParametersForGatewayClass(ctx context.Con
 	}
 
 	gwp := &v1alpha1.GatewayParameters{}
-	err := h.cli.Get(ctx, client.ObjectKey{Namespace: gwpNamespace, Name: gwpName}, gwp)
+	err := k.cli.Get(ctx, client.ObjectKey{Namespace: gwpNamespace, Name: gwpName}, gwp)
 	if err != nil {
 		return nil, deployer.GetGatewayParametersError(
 			err,
@@ -229,8 +229,8 @@ func (h *kGatewayParameters) getGatewayParametersForGatewayClass(ctx context.Con
 	return mergedGwp, nil
 }
 
-func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameters) (*deployer.HelmConfig, error) {
-	irGW := deployer.GetGatewayIR(gw, d.inputs.CommonCollections)
+func (k *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameters) (*deployer.HelmConfig, error) {
+	irGW := deployer.GetGatewayIR(gw, k.inputs.CommonCollections)
 
 	// construct the default values
 	vals := &deployer.HelmConfig{
@@ -242,8 +242,8 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 			Xds: &deployer.HelmXds{
 				// The xds host/port MUST map to the Service definition for the Control Plane
 				// This is the socket address that the Proxy will connect to on startup, to receive xds updates
-				Host: &d.inputs.ControlPlane.XdsHost,
-				Port: &d.inputs.ControlPlane.XdsPort,
+				Host: &k.inputs.ControlPlane.XdsHost,
+				Port: &k.inputs.ControlPlane.XdsPort,
 			},
 		},
 	}
@@ -307,12 +307,21 @@ func (d *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 	}
 	gateway.ComponentLogLevel = &compLogLevelStr
 
-	gateway.Resources = envoyContainerConfig.GetResources()
-	gateway.SecurityContext = envoyContainerConfig.GetSecurityContext()
-	gateway.Image = deployer.GetImageValues(envoyContainerConfig.GetImage())
+	agentgatewayEnabled := agentGatewayConfig.GetEnabled()
+	if agentgatewayEnabled != nil && *agentgatewayEnabled {
+		gateway.Resources = agentGatewayConfig.GetResources()
+		gateway.SecurityContext = agentGatewayConfig.GetSecurityContext()
+		gateway.Image = deployer.GetImageValues(agentGatewayConfig.GetImage())
+		gateway.Env = agentGatewayConfig.GetEnv()
+	} else {
+		gateway.Resources = envoyContainerConfig.GetResources()
+		gateway.SecurityContext = envoyContainerConfig.GetSecurityContext()
+		gateway.Image = deployer.GetImageValues(envoyContainerConfig.GetImage())
+		gateway.Env = envoyContainerConfig.GetEnv()
+	}
 
 	// istio values
-	gateway.Istio = deployer.GetIstioValues(d.inputs.IstioAutoMtlsEnabled, istioConfig)
+	gateway.Istio = deployer.GetIstioValues(k.inputs.IstioAutoMtlsEnabled, istioConfig)
 	gateway.SdsContainer = deployer.GetSdsContainerValues(sdsContainerConfig)
 	gateway.IstioContainer = deployer.GetIstioContainerValues(istioContainerConfig)
 
