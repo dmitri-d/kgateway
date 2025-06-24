@@ -126,6 +126,7 @@ func (h *kGatewayParameters) GetValues(ctx context.Context, gw *api.Gateway) (ma
 	if err != nil {
 		return nil, err
 	}
+	// If this is a self-managed Gateway, skip gateway auto provisioning
 	if gwParam != nil && gwParam.Spec.SelfManaged != nil {
 		return nil, nil
 	}
@@ -321,10 +322,18 @@ func (k *kGatewayParameters) getValues(gw *api.Gateway, gwParam *v1alpha1.Gatewa
 	}
 	gateway.ComponentLogLevel = &compLogLevelStr
 
-	gateway.Resources = envoyContainerConfig.GetResources()
-	gateway.SecurityContext = envoyContainerConfig.GetSecurityContext()
-	gateway.Image = getImageValues(envoyContainerConfig.GetImage())
-	gateway.Env = envoyContainerConfig.GetEnv()
+	agentgatewayEnabled := agentGatewayConfig.GetEnabled()
+	if agentgatewayEnabled != nil && *agentgatewayEnabled {
+		gateway.Resources = agentGatewayConfig.GetResources()
+		gateway.SecurityContext = agentGatewayConfig.GetSecurityContext()
+		gateway.Image = getImageValues(agentGatewayConfig.GetImage())
+		gateway.Env = agentGatewayConfig.GetEnv()
+	} else {
+		gateway.Resources = envoyContainerConfig.GetResources()
+		gateway.SecurityContext = envoyContainerConfig.GetSecurityContext()
+		gateway.Image = getImageValues(envoyContainerConfig.GetImage())
+		gateway.Env = envoyContainerConfig.GetEnv()
+	}
 
 	// istio values
 	gateway.Istio = getIstioValues(k.inputs.IstioAutoMtlsEnabled, istioConfig)
@@ -384,10 +393,7 @@ func getInMemoryGatewayParameters(name string, imageInfo *ImageInfo) *v1alpha1.G
 // set for the agentgateway deployment.
 func defaultAgentGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
 	gwp := defaultGatewayParameters(imageInfo)
-	gwp.Spec.Kube.AgentGateway = &v1alpha1.AgentGateway{
-		Enabled:  ptr.To(true),
-		LogLevel: ptr.To("info"),
-	}
+	gwp.Spec.Kube.AgentGateway.Enabled = ptr.To(true)
 	return gwp
 }
 
@@ -493,6 +499,22 @@ func defaultGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters 
 				AgentGateway: &v1alpha1.AgentGateway{
 					Enabled:  ptr.To(false),
 					LogLevel: ptr.To("info"),
+					Image: &v1alpha1.Image{
+						Registry:   ptr.To(AgentgatewayRegistry),
+						Tag:        ptr.To(AgentgatewayDefaultTag),
+						Repository: ptr.To(AgentgatewayImage),
+						PullPolicy: (*corev1.PullPolicy)(ptr.To(imageInfo.PullPolicy)),
+					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: ptr.To(false),
+						ReadOnlyRootFilesystem:   ptr.To(true),
+						RunAsNonRoot:             ptr.To(true),
+						RunAsUser:                ptr.To[int64](10101),
+						Capabilities: &corev1.Capabilities{
+							Drop: []corev1.Capability{"ALL"},
+							Add:  []corev1.Capability{"NET_BIND_SERVICE"},
+						},
+					},
 				},
 			},
 		},
