@@ -62,7 +62,7 @@ func ApplyFloatingUserId(dstKube *v1alpha1.KubernetesProxyConfig) {
 	}
 }
 
-// getInMemoryGatewayParameters returns an in-memory GatewayParameters based on the name of the gateway class.
+// GetInMemoryGatewayParameters returns an in-memory GatewayParameters based on the name of the gateway class.
 func GetInMemoryGatewayParameters(name string, imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
 	switch name {
 	case wellknown.WaypointClassName:
@@ -80,10 +80,7 @@ func GetInMemoryGatewayParameters(name string, imageInfo *ImageInfo) *v1alpha1.G
 // set for the agentgateway deployment.
 func defaultAgentGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters {
 	gwp := defaultGatewayParameters(imageInfo)
-	gwp.Spec.Kube.AgentGateway = &v1alpha1.AgentGateway{
-		Enabled:  ptr.To(true),
-		LogLevel: ptr.To("info"),
-	}
+	gwp.Spec.Kube.AgentGateway.Enabled = ptr.To(true)
 	return gwp
 }
 
@@ -189,6 +186,22 @@ func defaultGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters 
 				AgentGateway: &v1alpha1.AgentGateway{
 					Enabled:  ptr.To(false),
 					LogLevel: ptr.To("info"),
+					Image: &v1alpha1.Image{
+						Registry:   ptr.To(AgentgatewayRegistry),
+						Tag:        ptr.To(AgentgatewayDefaultTag),
+						Repository: ptr.To(AgentgatewayImage),
+						PullPolicy: (*corev1.PullPolicy)(ptr.To(imageInfo.PullPolicy)),
+					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: ptr.To(false),
+						ReadOnlyRootFilesystem:   ptr.To(true),
+						RunAsNonRoot:             ptr.To(true),
+						RunAsUser:                ptr.To[int64](10101),
+						Capabilities: &corev1.Capabilities{
+							Drop: []corev1.Capability{"ALL"},
+							Add:  []corev1.Capability{"NET_BIND_SERVICE"},
+						},
+					},
 				},
 			},
 		},

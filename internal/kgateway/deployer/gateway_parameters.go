@@ -121,6 +121,7 @@ func (h *kGatewayParameters) GetValues(ctx context.Context, gw *api.Gateway) (ma
 	if err != nil {
 		return nil, err
 	}
+	// If this is a self-managed Gateway, skip gateway auto provisioning
 	if gwParam != nil && gwParam.Spec.SelfManaged != nil {
 		return nil, nil
 	}
