@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"istio.io/istio/pkg/config/labels"
+	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +26,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/metrics"
 	pluginsdkir "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 )
 
@@ -288,7 +290,11 @@ func NewGatewayIndex(
 		}}
 	})
 
+	metricsRecorder := NewCollectionMetricsRecorder("Gateways")
+
 	h.Gateways = krt.NewCollection(gws, func(kctx krt.HandlerContext, i *gwv1.Gateway) *ir.Gateway {
+		defer metricsRecorder.TransformStart()(nil)
+
 		// only care about gateways use a class controlled by us
 		gwClass := ptr.Flatten(krt.FetchOne(kctx, gwClasses, krt.FilterKey(string(i.Spec.GatewayClassName))))
 		if gwClass == nil || controllerName != string(gwClass.Spec.ControllerName) {
@@ -388,6 +394,34 @@ func NewGatewayIndex(
 
 		return &out
 	}, krtopts.ToOptions("gateways")...)
+
+	metrics.RegisterEvents(h.Gateways, func(o krt.Event[ir.Gateway]) {
+		switch o.Event {
+		case controllers.EventDelete:
+			metricsRecorder.SetResources(CollectionResourcesMetricLabels{
+				Namespace: o.Latest().Namespace,
+				Name:      o.Latest().Name,
+				Resource:  "Gateway",
+			}, 0)
+			metricsRecorder.SetResources(CollectionResourcesMetricLabels{
+				Namespace: o.Latest().Namespace,
+				Name:      o.Latest().Name,
+				Resource:  "Listeners",
+			}, 0)
+		case controllers.EventAdd, controllers.EventUpdate:
+			metricsRecorder.SetResources(CollectionResourcesMetricLabels{
+				Namespace: o.Latest().Namespace,
+				Name:      o.Latest().Name,
+				Resource:  "Gateway",
+			}, 1)
+			metricsRecorder.SetResources(CollectionResourcesMetricLabels{
+				Namespace: o.Latest().Namespace,
+				Name:      o.Latest().Name,
+				Resource:  "Listeners",
+			}, len(o.Latest().Obj.Spec.Listeners))
+		}
+	})
+
 	return h
 }
 
@@ -768,10 +802,7 @@ func (r *RefGrantIndex) ReferenceAllowed(kctx krt.HandlerContext, fromgk schema.
 	}
 	// try with name:
 	key.ToName = to.Name
-	if len(krt.Fetch(kctx, r.refgrants, krt.FilterIndex(r.refGrantIndex, key))) != 0 {
-		return true
-	}
-	return false
+	return len(krt.Fetch(kctx, r.refgrants, krt.FilterIndex(r.refGrantIndex, key))) != 0
 }
 
 type RouteWrapper struct {

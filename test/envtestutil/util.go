@@ -96,7 +96,7 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 	}
 
 	// setup xDS server:
-	uniqueClientCallbacks, builder := krtcollections.NewUniquelyConnectedClients()
+	uniqueClientCallbacks, builder := krtcollections.NewUniquelyConnectedClients(nil)
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
