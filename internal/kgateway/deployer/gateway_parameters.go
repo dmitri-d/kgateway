@@ -57,7 +57,7 @@ func (gp *GatewayParameters) GetValues(ctx context.Context, obj client.Object) (
 		return nil, fmt.Errorf("expected a Gateway resource, got %s", obj.GetObjectKind().GroupVersionKind().String())
 	}
 
-	ref, err := gp.getGatewayParametersRef(ctx, gw)
+	ref, err := gp.getGatewayParametersGK(ctx, gw)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func GatewayReleaseNameAndNamespace(obj client.Object) (string, string) {
 	return obj.GetName(), obj.GetNamespace()
 }
 
-func (gp *GatewayParameters) getGatewayParametersRef(ctx context.Context, gw *api.Gateway) (schema.GroupKind, error) {
+func (gp *GatewayParameters) getGatewayParametersGK(ctx context.Context, gw *api.Gateway) (schema.GroupKind, error) {
 	logger := log.FromContext(ctx)
 
 	// attempt to get the GatewayParameters name from the Gateway. If we can't find it,
@@ -87,7 +87,7 @@ func (gp *GatewayParameters) getGatewayParametersRef(ctx context.Context, gw *ap
 			"gatewayName", gw.GetName(),
 			"gatewayNamespace", gw.GetNamespace(),
 		)
-		return gp.getDefaultGatewayParametersRef(ctx, gw)
+		return gp.getDefaultGatewayParametersGK(ctx, gw)
 	}
 
 	return schema.GroupKind{
@@ -96,7 +96,7 @@ func (gp *GatewayParameters) getGatewayParametersRef(ctx context.Context, gw *ap
 		nil
 }
 
-func (gp *GatewayParameters) getDefaultGatewayParametersRef(ctx context.Context, gw *api.Gateway) (schema.GroupKind, error) {
+func (gp *GatewayParameters) getDefaultGatewayParametersGK(ctx context.Context, gw *api.Gateway) (schema.GroupKind, error) {
 	gwc, err := getGatewayClassFromGateway(ctx, gp.cli, gw)
 	if err != nil {
 		return schema.GroupKind{}, err
