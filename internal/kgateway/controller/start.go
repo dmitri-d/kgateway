@@ -73,8 +73,9 @@ type StartConfig struct {
 	// This is responsible for producing the extension points that this controller requires
 	ExtraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
 	ExtraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
-	AddToScheme            func(s *runtime.Scheme) error
-	Client                 istiokube.Client
+	// kgateway default scheme will be extended with these schemes
+	AddToScheme func(s *runtime.Scheme) error
+	Client      istiokube.Client
 
 	AugmentedPods krt.Collection[krtcollections.LocalityPod]
 	UniqueClients krt.Collection[ir.UniqlyConnectedClient]

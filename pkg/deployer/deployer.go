@@ -124,6 +124,10 @@ func (d *Deployer) Render(name, ns string, vals map[string]any) ([]client.Object
 // * sets ownerRefs on all generated objects
 //
 // * returns the objects to be deployed by the caller
+//
+// obj can currently be a pointer to a Gateway (https://github.com/kubernetes-sigs/gateway-api/blob/main/apis/v1/gateway_types.go#L35) or
+//
+//	a pointer to an InferencePool (https://github.com/kubernetes-sigs/gateway-api-inference-extension/blob/main/api/v1alpha2/inferencepool_types.go#L30)
 func (d *Deployer) GetObjsToDeploy(ctx context.Context, obj client.Object) ([]client.Object, error) {
 	logger := log.FromContext(ctx)
 
