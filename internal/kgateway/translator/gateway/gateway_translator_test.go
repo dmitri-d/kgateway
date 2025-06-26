@@ -668,6 +668,14 @@ var _ = DescribeTable("Basic GatewayTranslator Tests",
 			Name:      "example-gateway",
 		},
 	}),
+	Entry("Backend Config Policy with Health Check", translatorTestCase{
+		inputFile:  "backendconfigpolicy/healthcheck.yaml",
+		outputFile: "backendconfigpolicy/healthcheck.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
 	Entry("Backend Config Policy with Common HTTP Protocol - HTTP backend", translatorTestCase{
 		inputFile:  "backendconfigpolicy/commonhttpprotocol-httpbackend.yaml",
 		outputFile: "backendconfigpolicy/commonhttpprotocol-httpbackend.yaml",

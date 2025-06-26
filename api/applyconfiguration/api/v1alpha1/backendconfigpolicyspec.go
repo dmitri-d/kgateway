@@ -18,6 +18,7 @@ type BackendConfigPolicySpecApplyConfiguration struct {
 	Http1ProtocolOptions          *Http1ProtocolOptionsApplyConfiguration        `json:"http1ProtocolOptions,omitempty"`
 	TLS                           *TLSApplyConfiguration                         `json:"tls,omitempty"`
 	LoadBalancer                  *LoadBalancerApplyConfiguration                `json:"loadBalancer,omitempty"`
+	HealthCheck                   *HealthCheckApplyConfiguration                 `json:"healthCheck,omitempty"`
 }
 
 // BackendConfigPolicySpecApplyConfiguration constructs a declarative configuration of the BackendConfigPolicySpec type for use with
@@ -105,5 +106,13 @@ func (b *BackendConfigPolicySpecApplyConfiguration) WithTLS(value *TLSApplyConfi
 // If called multiple times, the LoadBalancer field is set to the value of the last call.
 func (b *BackendConfigPolicySpecApplyConfiguration) WithLoadBalancer(value *LoadBalancerApplyConfiguration) *BackendConfigPolicySpecApplyConfiguration {
 	b.LoadBalancer = value
+	return b
+}
+
+// WithHealthCheck sets the HealthCheck field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HealthCheck field is set to the value of the last call.
+func (b *BackendConfigPolicySpecApplyConfiguration) WithHealthCheck(value *HealthCheckApplyConfiguration) *BackendConfigPolicySpecApplyConfiguration {
+	b.HealthCheck = value
 	return b
 }

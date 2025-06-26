@@ -61,6 +61,60 @@ spec:
                 x-kubernetes-validations:
                 - message: connectTimeout must be a valid duration string
                   rule: duration(self) >= duration('0s')
+              healthCheck:
+                properties:
+                  grpc:
+                    properties:
+                      authority:
+                        type: string
+                      serviceName:
+                        type: string
+                    type: object
+                  healthyThreshold:
+                    format: int32
+                    type: integer
+                  http:
+                    properties:
+                      host:
+                        type: string
+                      method:
+                        enum:
+                        - GET
+                        - HEAD
+                        - POST
+                        - PUT
+                        - DELETE
+                        - OPTIONS
+                        - TRACE
+                        - PATCH
+                        type: string
+                      path:
+                        type: string
+                    required:
+                    - path
+                    type: object
+                  interval:
+                    type: string
+                    x-kubernetes-validations:
+                    - message: interval must be a valid duration string
+                      rule: duration(self) >= duration('0s')
+                  timeout:
+                    type: string
+                    x-kubernetes-validations:
+                    - message: timeout must be a valid duration string
+                      rule: duration(self) >= duration('0s')
+                  unhealthyThreshold:
+                    format: int32
+                    type: integer
+                required:
+                - healthyThreshold
+                - interval
+                - timeout
+                - unhealthyThreshold
+                type: object
+                x-kubernetes-validations:
+                - message: exactly one of http or grpc must be set
+                  rule: has(self.http) != has(self.grpc)
               http1ProtocolOptions:
                 properties:
                   enableTrailers:

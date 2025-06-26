@@ -68,6 +68,10 @@ type BackendConfigPolicySpec struct {
 	// LoadBalancer contains the options necessary to configure the load balancer.
 	// +optional
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
+
+	// HealthCheck contains the options necessary to configure the health check.
+	// +optional
+	HealthCheck *HealthCheck `json:"healthCheck,omitempty"`
 }
 
 // See [Envoy documentation](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/protocol.proto#envoy-v3-api-msg-config-core-v3-http1protocoloptions) for more details.
@@ -367,3 +371,70 @@ const (
 	// This field is required to enable locality weighted load balancing.
 	LocalityConfigTypeWeightedLb LocalityType = "WeightedLb"
 )
+
+// HealthCheck contains the options to configure the health check.
+// See [Envoy documentation](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/health_check.proto) for more details.
+// +optional
+// +kubebuilder:validation:XValidation:rule="has(self.http) != has(self.grpc)",message="exactly one of http or grpc must be set"
+type HealthCheck struct {
+	// Timeout is time to wait for a health check response. If the timeout is reached the
+	// health check attempt will be considered a failure.
+	// +required
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s')",message="timeout must be a valid duration string"
+	Timeout *metav1.Duration `json:"timeout"`
+
+	// Interval is the time between health checks.
+	// +required
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s')",message="interval must be a valid duration string"
+	Interval *metav1.Duration `json:"interval"`
+
+	// UnhealthyThreshold is the number of consecutive failed health checks that will be considered
+	// unhealthy.
+	// Note that for HTTP health checks, if a host responds with a code not in ExpectedStatuses or RetriableStatuses,
+	// this threshold is ignored and the host is considered immediately unhealthy.
+	// +required
+	UnhealthyThreshold *uint32 `json:"unhealthyThreshold"`
+
+	// HealthyThreshold is the number of healthy health checks required before a host is marked
+	// healthy. Note that during startup, only a single successful health check is
+	// required to mark a host healthy.
+	// +required
+	HealthyThreshold *uint32 `json:"healthyThreshold"`
+
+	// Http contains the options to configure the HTTP health check.
+	// +optional
+	Http *HealthCheckHttp `json:"http,omitempty"`
+
+	// Grpc contains the options to configure the gRPC health check.
+	// +optional
+	Grpc *HealthCheckGrpc `json:"grpc,omitempty"`
+}
+type HealthCheckHttp struct {
+	// Host is the value of the host header in the HTTP health check request. If
+	// unset, the name of the cluster this health check is associated
+	// with will be used.
+	// +optional
+	Host *string `json:"host,omitempty"`
+
+	// Path is the HTTP path requested.
+	// +required
+	Path string `json:"path"`
+
+	// Method is the HTTP method to use.
+	// If unset, GET is used.
+	// +optional
+	// +kubebuilder:validation:Enum=GET;HEAD;POST;PUT;DELETE;OPTIONS;TRACE;PATCH
+	Method *string `json:"method,omitempty"`
+}
+
+type HealthCheckGrpc struct {
+	// ServiceName is the optional name of the service to check.
+	// +optional
+	ServiceName *string `json:"serviceName,omitempty"`
+
+	// Authority is the authority header used to make the gRPC health check request.
+	// If unset, the name of the cluster this health check is associated
+	// with will be used.
+	// +optional
+	Authority *string `json:"authority,omitempty"`
+}
