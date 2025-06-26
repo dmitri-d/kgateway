@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/kube/kubetypes"
@@ -198,20 +197,11 @@ func (c *controllerBuilder) watchGw(ctx context.Context) error {
 	if c.extraGatewayParameters != nil {
 		gwParams.WithExtraGatewayParameters(c.extraGatewayParameters(c.cfg.Mgr.GetClient(), inputs)...)
 	}
-	chart, err := LoadKgatewayChart()
+	d, err := internaldeployer.NewGatewayDeployer(c.cfg.ControllerName, c.cfg.Mgr.GetClient(), gwParams)
 	if err != nil {
 		return err
 	}
-	d := deployer.NewDeployer(
-		c.cfg.ControllerName, c.cfg.Mgr.GetClient(), chart, gwParams, internaldeployer.GatewayReleaseNameAndNamespace)
-	gvks, err := c.getGvksToWatch(ctx, d, map[string]any{
-		"gateway": map[string]any{
-			"istio": map[string]any{
-				"enabled": false,
-			},
-			"image": map[string]any{},
-		},
-	})
+	gvks, err := internaldeployer.GatewayGVKsToWatch(ctx, d)
 	if err != nil {
 		return err
 	}
@@ -434,20 +424,12 @@ func (c *controllerBuilder) watchInferencePool(ctx context.Context) error {
 
 	// If enabled, create a deployer using the controllerBuilder as inputs.
 	if c.poolCfg.InferenceExt != nil {
-		inferenceExt := &internaldeployer.InferenceExtension{}
-		chart, err := LoadInferenceExtensionChart()
+		d, err := internaldeployer.NewInferencePoolDeployer(c.cfg.ControllerName, c.cfg.Mgr.GetClient())
 		if err != nil {
 			return err
 		}
-		d := deployer.NewDeployer(
-			c.cfg.ControllerName, c.cfg.Mgr.GetClient(), chart, inferenceExt,
-			internaldeployer.InferenceExtensionReleaseNameAndNamespace)
 		// Watch child objects, e.g. Deployments, created by the inference pool deployer.
-		gvks, err := c.getGvksToWatch(ctx, d, map[string]any{
-			"inferenceExtension": map[string]any{
-				"endpointPicker": map[string]any{},
-			},
-		})
+		gvks, err := internaldeployer.InferencePoolGVKsToWatch(ctx, d)
 		if err != nil {
 			return err
 		}
@@ -551,41 +533,4 @@ func (r *controllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log.Info("updated gateway class status")
 
 	return ctrl.Result{}, nil
-}
-
-func (c *controllerBuilder) getGvksToWatch(ctx context.Context, d *deployer.Deployer, vals map[string]any) ([]schema.GroupVersionKind, error) {
-	// The deployer watches all resources (Deployment, Service, ServiceAccount, and ConfigMap)
-	// that it creates via the deployer helm chart.
-	//
-	// In order to get the GVKs for the resources to watch, we need:
-	// - a placeholder Gateway (only the name and namespace are used, but the actual values don't matter,
-	//   as we only care about the GVKs of the rendered resources)
-	// - the minimal values that render all the proxy resources (HPA is not included because it's not
-	//   fully integrated/working at the moment)
-	//
-	// Note: another option is to hardcode the GVKs here, but rendering the helm chart is a
-	// _slightly_ more dynamic way of getting the GVKs. It isn't a perfect solution since if
-	// we add more resources to the helm chart that are gated by a flag, we may forget to
-	// update the values here to enable them.
-
-	// TODO(Law): these must be set explicitly as we don't have defaults for them
-	// and the internal template isn't robust enough.
-	// This should be empty eventually -- the template must be resilient against nil-pointers
-	// i.e. don't add stuff here!
-
-	// The namespace and name do not matter since we only care about the GVKs of the rendered resources.
-	objs, err := d.RenderChartToObjects("default", "default", vals)
-	if err != nil {
-		return nil, err
-	}
-	var ret []schema.GroupVersionKind
-	for _, obj := range objs {
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		if !slices.Contains(ret, gvk) {
-			ret = append(ret, gvk)
-		}
-	}
-
-	log.FromContext(ctx).V(1).Info("watching GVKs", "GVKs", ret)
-	return ret, nil
 }

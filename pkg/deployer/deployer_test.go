@@ -375,7 +375,7 @@ var _ = Describe("Deployer", func() {
 					Tag:      "bar",
 				},
 			})
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d := deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, gwParams), chart,
 				gwp,
@@ -451,7 +451,7 @@ var _ = Describe("Deployer", func() {
 					Tag:      "bar",
 				},
 			})
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d = deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, gwp), chart,
 				gwParams,
@@ -520,7 +520,7 @@ var _ = Describe("Deployer", func() {
 					Tag:      "bar",
 				},
 			})
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d := deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, gwp), chart,
 				gwParams,
@@ -556,43 +556,6 @@ var _ = Describe("Deployer", func() {
 			Expect(cm.Data["config.json"]).To(ContainSubstring(`"alt_xds_hostname": "agent-gateway.default.svc.cluster.local"`))
 		})
 	})
-
-	// TODO (dmitri-d) this has been moved to controllerBuilder
-	// move the test somewhere there
-	// Context("watches", func() {
-	// 	BeforeEach(func() {
-	// 		var err error
-	// 		gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()))
-	// 		chart, err := controller.LoadKgatewayChart()
-	// 		Expect(err).NotTo(HaveOccurred())
-	// 		d = deployer.NewDeployer(newFakeClientWithObjs(defaultGatewayClass(), defaultGatewayParams()), chart, &deployer.Inputs{
-	// 			CommonCollections: newCommonCols(GinkgoT()),
-	// 			ControllerName:    wellknown.GatewayControllerName,
-	// 			Dev:               false,
-	// 			ControlPlane: deployer.ControlPlaneInfo{
-	// 				XdsHost: "something.cluster.local",
-	// 				XdsPort: 1234,
-	// 			},
-	// 			ImageInfo: &deployer.ImageInfo{
-	// 				Registry: "foo",
-	// 				Tag:      "bar",
-	// 			},
-	// 		}, gwParams)
-	// 	})
-	//
-	//
-	// It("should get gvks", func() {
-	// 	gvks, err := d.GetGvksToWatch(context.Background())
-	// 	Expect(err).NotTo(HaveOccurred())
-	// 	Expect(gvks).To(HaveLen(4))
-	// 	Expect(gvks).To(ConsistOf(
-	// 		wellknown.DeploymentGVK,
-	// 		wellknown.ServiceGVK,
-	// 		wellknown.ServiceAccountGVK,
-	// 		wellknown.ConfigMapGVK,
-	// 	))
-	// })
-	// })
 
 	Context("special cases", func() {
 		var (
@@ -645,7 +608,7 @@ var _ = Describe("Deployer", func() {
 					Tag:      "bar",
 				},
 			})
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d1 := deployer.NewDeployer(wellknown.GatewayControllerName,
 				newFakeClientWithObjs(gwc, defaultGatewayParams()), chart,
@@ -728,7 +691,7 @@ var _ = Describe("Deployer", func() {
 					Tag:      "bar",
 				},
 			})
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d := deployer.NewDeployer(wellknown.GatewayControllerName,
 				newFakeClientWithObjs(defaultGatewayClass()), chart,
@@ -770,7 +733,7 @@ var _ = Describe("Deployer", func() {
 					Tag:      "bar",
 				},
 			})
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d := deployer.NewDeployer(
 				wellknown.GatewayControllerName,
@@ -832,7 +795,7 @@ var _ = Describe("Deployer", func() {
 						Tag:      tag,
 					},
 				})
-				chart, err := controller.LoadKgatewayChart()
+				chart, err := internaldeployer.LoadGatewayChart()
 				Expect(err).NotTo(HaveOccurred())
 				d = deployer.NewDeployer(
 					wellknown.GatewayControllerName,
@@ -922,7 +885,7 @@ var _ = Describe("Deployer", func() {
 						Tag:      tag,
 					},
 				})
-				chart, err := controller.LoadKgatewayChart()
+				chart, err := internaldeployer.LoadGatewayChart()
 				Expect(err).NotTo(HaveOccurred())
 				d = deployer.NewDeployer(
 					wellknown.GatewayControllerName,
@@ -1020,7 +983,7 @@ var _ = Describe("Deployer", func() {
 						Tag:      tag,
 					},
 				})
-				chart, err := controller.LoadKgatewayChart()
+				chart, err := internaldeployer.LoadGatewayChart()
 				Expect(err).NotTo(HaveOccurred())
 				d = deployer.NewDeployer(
 					wellknown.GatewayControllerName,
@@ -1759,7 +1722,7 @@ var _ = Describe("Deployer", func() {
 			}
 
 			gwParams := internaldeployer.NewGatewayParameters(newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), inp.dInputs)
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d := deployer.NewDeployer(wellknown.GatewayControllerName, newFakeClientWithObjs(gwc, defaultGwp, overrideGwp), chart,
 				gwParams,
@@ -2090,7 +2053,7 @@ var _ = Describe("Deployer", func() {
 
 			// Initialize a new deployer with InferenceExtension inputs.
 			ie := &internaldeployer.InferenceExtension{}
-			chart, err := controller.LoadInferenceExtensionChart()
+			chart, err := internaldeployer.LoadInferencePoolChart()
 			Expect(err).NotTo(HaveOccurred())
 			cli := newFakeClientWithObjs(pool)
 			d := deployer.NewDeployer(wellknown.GatewayControllerName, cli, chart,
@@ -2240,7 +2203,7 @@ var _ = Describe("Deployer", func() {
 						Tag:      "bar",
 					},
 				})
-			chart, err := controller.LoadKgatewayChart()
+			chart, err := internaldeployer.LoadGatewayChart()
 			Expect(err).NotTo(HaveOccurred())
 			d := deployer.NewDeployer(
 				wellknown.GatewayControllerName,

@@ -1,4 +1,4 @@
-package controller
+package deployer
 
 import (
 	"embed"
@@ -9,17 +9,8 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/helm"
 	"github.com/kgateway-dev/kgateway/v2/internal/version"
 )
-
-func LoadKgatewayChart() (*chart.Chart, error) {
-	return loadChart(helm.KgatewayHelmChart)
-}
-
-func LoadInferenceExtensionChart() (*chart.Chart, error) {
-	return loadChart(helm.InferenceExtensionHelmChart)
-}
 
 func loadChart(fs embed.FS) (*chart.Chart, error) {
 	c, err := loadFs(fs)

@@ -6,12 +6,14 @@ import (
 	"slices"
 
 	"github.com/rotisserie/eris"
+	"helm.sh/helm/v3/pkg/chart"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	api "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/helm"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 )
@@ -43,6 +45,21 @@ func (gp *GatewayParameters) WithExtraGatewayParameters(params ...deployer.Extra
 		gp.extraHVGenerators[schema.GroupKind{Group: p.Group, Kind: p.Kind}] = p.Generator
 	}
 	return gp
+}
+
+func LoadGatewayChart() (*chart.Chart, error) {
+	return loadChart(helm.KgatewayHelmChart)
+}
+
+func GatewayGVKsToWatch(ctx context.Context, d *deployer.Deployer) ([]schema.GroupVersionKind, error) {
+	return d.GetGvksToWatch(ctx, map[string]any{
+		"gateway": map[string]any{
+			"istio": map[string]any{
+				"enabled": false,
+			},
+			"image": map[string]any{},
+		},
+	})
 }
 
 func (gp *GatewayParameters) AllKnownGatewayParameters() []client.Object {

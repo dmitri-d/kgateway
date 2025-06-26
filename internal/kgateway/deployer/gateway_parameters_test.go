@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -103,6 +104,45 @@ func TestShouldUseExtendedGatewayParameters(t *testing.T) {
 	assert.Contains(t, vals, "testHelmValuesGenerator")
 }
 
+func TestGatewayGVKsToWatch(t *testing.T) {
+	gwc := defaultGatewayClass()
+	gwParams := emptyGatewayParameters()
+	cli := newFakeClientWithObjs(gwc, gwParams)
+	gwp := NewGatewayParameters(cli, defaultInputs(t, gwc))
+
+	d, err := NewGatewayDeployer(wellknown.GatewayControllerName, cli, gwp)
+	assert.NoError(t, err)
+
+	gvks, err := GatewayGVKsToWatch(context.TODO(), d)
+	assert.NoError(t, err)
+	assert.Len(t, gvks, 4)
+	assert.ElementsMatch(t, gvks, []schema.GroupVersionKind{
+		wellknown.DeploymentGVK,
+		wellknown.ServiceGVK,
+		wellknown.ServiceAccountGVK,
+		wellknown.ConfigMapGVK,
+	})
+}
+
+func TestInferencePoolGVKsToWatch(t *testing.T) {
+	gwc := defaultGatewayClass()
+	gwParams := emptyGatewayParameters()
+	cli := newFakeClientWithObjs(gwc, gwParams)
+
+	d, err := NewInferencePoolDeployer(wellknown.GatewayControllerName, cli)
+	assert.NoError(t, err)
+
+	gvks, err := InferencePoolGVKsToWatch(context.TODO(), d)
+	assert.NoError(t, err)
+	assert.Len(t, gvks, 4)
+	assert.ElementsMatch(t, gvks, []schema.GroupVersionKind{
+		wellknown.DeploymentGVK,
+		wellknown.ServiceGVK,
+		wellknown.ServiceAccountGVK,
+		wellknown.ClusterRoleBindingGVK,
+	})
+}
+
 func defaultGatewayClass() *api.GatewayClass {
 	return &api.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -135,9 +175,9 @@ func emptyGatewayParameters() *gw2_v1alpha1.GatewayParameters {
 	}
 }
 
-func defaultInputs(t *testing.T, gwc *api.GatewayClass, gw *api.Gateway) *deployer.Inputs {
+func defaultInputs(t *testing.T, objs ...client.Object) *deployer.Inputs {
 	return &deployer.Inputs{
-		CommonCollections: newCommonCols(t, gwc, gw),
+		CommonCollections: newCommonCols(t, objs...),
 		Dev:               false,
 		ControlPlane: deployer.ControlPlaneInfo{
 			XdsHost: "something.cluster.local",

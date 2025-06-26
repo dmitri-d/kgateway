@@ -4,13 +4,28 @@ import (
 	"context"
 	"fmt"
 
+	"helm.sh/helm/v3/pkg/chart"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/helm"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 )
 
 type InferenceExtension struct{}
+
+func LoadInferencePoolChart() (*chart.Chart, error) {
+	return loadChart(helm.InferenceExtensionHelmChart)
+}
+
+func InferencePoolGVKsToWatch(ctx context.Context, d *deployer.Deployer) ([]schema.GroupVersionKind, error) {
+	return d.GetGvksToWatch(ctx, map[string]any{
+		"inferenceExtension": map[string]any{
+			"endpointPicker": map[string]any{},
+		},
+	})
+}
 
 func (ie *InferenceExtension) GetValues(_ context.Context, obj client.Object) (map[string]any, error) {
 	if obj == nil {
