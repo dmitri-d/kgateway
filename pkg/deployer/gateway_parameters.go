@@ -1,8 +1,6 @@
 package deployer
 
 import (
-	"context"
-
 	"istio.io/api/annotation"
 	"istio.io/api/label"
 	corev1 "k8s.io/api/core/v1"
@@ -13,10 +11,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 )
-
-type HelmValuesGenerator interface {
-	GetValues(ctx context.Context, obj client.Object) (map[string]any, error)
-}
 
 // Inputs is the set of options used to configure gateway/ineference pool deployment.
 type Inputs struct {
