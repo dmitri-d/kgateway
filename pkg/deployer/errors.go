@@ -1,13 +1,15 @@
 package deployer
 
-import "github.com/rotisserie/eris"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
-	GatewayParametersError    = eris.New("could not retrieve GatewayParameters")
+	GatewayParametersError    = errors.New("could not retrieve GatewayParameters")
 	GetGatewayParametersError = func(err error, gwpNamespace, gwpName, gwNamespace, gwName, resourceType string) error {
-		wrapped := eris.Wrap(err, GatewayParametersError.Error())
-		return eris.Wrapf(wrapped, "(%s.%s) for %s (%s.%s)",
-			gwpNamespace, gwpName, resourceType, gwNamespace, gwName)
+		return fmt.Errorf("(%s.%s) for %s (%s.%s): %w",
+			gwpNamespace, gwpName, resourceType, gwNamespace, gwName, fmt.Errorf("%s: %w", GatewayParametersError.Error(), err))
 	}
-	NilDeployerInputsErr = eris.New("nil inputs to NewDeployer")
+	NilDeployerInputsErr = errors.New("nil inputs to NewDeployer")
 )
