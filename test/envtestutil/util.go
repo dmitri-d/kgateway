@@ -17,12 +17,16 @@ import (
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/yaml"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/controller"
@@ -117,7 +121,29 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		setup.StartKgatewayWithConfig(ctx, wellknown.DefaultGatewayControllerName, wellknown.DefaultGatewayClassName, wellknown.DefaultWaypointClassName, wellknown.DefaultAgentGatewayClassName, setupOpts, cfg, builder, extraPlugins, extraGatewayParameters, nil)
+		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+			BaseContext:      func() context.Context { return ctx },
+			Scheme:           runtime.NewScheme(),
+			PprofBindAddress: "127.0.0.1:9099",
+			// if you change the port here, also change the port "health" in the helmchart.
+			HealthProbeBindAddress: ":9093",
+			Controller: config.Controller{
+				// see https://github.com/kubernetes-sigs/controller-runtime/issues/2937
+				// in short, our tests reuse the same name (reasonably so) and the controller-runtime
+				// package does not reset the stack of controller names between tests, so we disable
+				// the name validation here.
+				SkipNameValidation: ptr.To(true),
+			},
+		})
+		if err != nil {
+			panic("failed to create a manager")
+		}
+
+		setup.BuildKgatewayWithConfig(ctx, mgr,
+			wellknown.DefaultGatewayControllerName, wellknown.DefaultGatewayClassName, wellknown.DefaultWaypointClassName,
+			wellknown.DefaultAgentGatewayClassName, setupOpts, cfg, builder, extraPlugins, extraGatewayParameters)
+
+		mgr.Start(ctx)
 	}()
 	// give kgateway time to initialize so we don't get
 	// "kgateway not initialized" error

@@ -5,12 +5,15 @@ import (
 
 	xdsserver "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	core "github.com/kgateway-dev/kgateway/v2/internal/kgateway/setup"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type Options struct {
@@ -22,6 +25,10 @@ type Options struct {
 	ExtraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	AddToScheme              func(s *runtime.Scheme) error
 	ExtraXDSCallbacks        xdsserver.Callbacks
+	RestConfig               *rest.Config
+	CtrlMgrOptions           *ctrl.Options
+	// extra controller manager config, like adding registering additional controllers
+	ExtraManagerConfig []func(ctx context.Context, mgr manager.Manager) error
 }
 
 func New(opts Options) core.Server {
@@ -33,7 +40,9 @@ func New(opts Options) core.Server {
 		core.WithGatewayClassName(opts.GatewayClassName),
 		core.WithWaypointClassName(opts.WaypointGatewayClassName),
 		core.WithAgentGatewayClassName(opts.AgentGatewayClassName),
-		core.AddToScheme(opts.AddToScheme),
 		core.WithExtraXDSCallbacks(opts.ExtraXDSCallbacks),
+		core.WithRestConfig(opts.RestConfig),
+		core.WithControllerManagerOptions(opts.CtrlMgrOptions),
+		core.WithExtraManagerConfig(opts.ExtraManagerConfig...),
 	)
 }
