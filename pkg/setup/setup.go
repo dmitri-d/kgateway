@@ -4,7 +4,6 @@ import (
 	"context"
 
 	xdsserver "github.com/envoyproxy/go-control-plane/pkg/server/v3"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -24,7 +23,6 @@ type Options struct {
 	AgentGatewayClassName    string
 	ExtraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
 	ExtraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
-	AddToScheme              func(s *runtime.Scheme) error
 	ExtraXDSCallbacks        xdsserver.Callbacks
 	RestConfig               *rest.Config
 	CtrlMgrOptions           *ctrl.Options
