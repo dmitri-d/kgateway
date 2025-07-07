@@ -189,7 +189,7 @@ func (s *setup) Start(ctx context.Context) error {
 
 	BuildKgatewayWithConfig(
 		ctx, mgr, s.gatewayControllerName, s.gatewayClassName, s.waypointClassName,
-		s.agentGatewayClassName, setupOpts, s.restConfig, uccBuilder, s.extraPlugins, s.extraGatewayParameters)
+		s.agentGatewayClassName, setupOpts, restConfig, uccBuilder, s.extraPlugins, s.extraGatewayParameters)
 
 	slog.Info("starting admin server")
 	go admin.RunAdminServer(ctx, setupOpts)
