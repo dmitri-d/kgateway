@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/admin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/controller"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
@@ -29,7 +31,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 type Server interface {
@@ -103,7 +104,6 @@ type setup struct {
 	agentGatewayClassName  string
 	extraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
-	addToScheme            func(s *runtime.Scheme) error
 	extraXDSCallbacks      xdsserver.Callbacks
 	restConfig             *rest.Config
 	ctrlMgrOptions         *ctrl.Options
