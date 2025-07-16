@@ -33,12 +33,14 @@ type RouteConfigContext struct {
 	Policy            PolicyIR
 	FilterChainName   string
 	TypedFilterConfig TypedFilterConfigMap
+	Gateway           GatewayIR
 }
 
 type VirtualHostContext struct {
 	Policy            PolicyIR
 	FilterChainName   string
 	TypedFilterConfig TypedFilterConfigMap
+	Gateway           GatewayIR
 }
 
 type TypedFilterConfigMap map[string]proto.Message
@@ -79,6 +81,7 @@ func (r *TypedFilterConfigMap) ToAnyMap() map[string]*anypb.Any {
 }
 
 type RouteBackendContext struct {
+	Gateway         GatewayIR
 	FilterChainName string
 	Backend         *BackendObjectIR
 	// TypedFilterConfig will be output on the Route or WeightedCluster level after all plugins have run
@@ -92,6 +95,7 @@ type RouteBackendContext struct {
 type RouteContext struct {
 	FilterChainName string
 	Policy          PolicyIR
+	Gateway         GatewayIR
 	In              HttpRouteRuleMatchIR
 	// TypedFilterConfig will be output on the Route level after all plugins have run
 	TypedFilterConfig TypedFilterConfigMap
