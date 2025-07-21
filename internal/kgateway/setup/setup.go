@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	istiokube "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
+	"istio.io/istio/pkg/kube/kubetypes"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -24,10 +25,12 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"github.com/kgateway-dev/kgateway/v2/pkg/metrics"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
@@ -91,7 +94,7 @@ func WithExtraXDSCallbacks(extraXDSCallbacks xdsserver.Callbacks) func(*setup) {
 	}
 }
 
-func WithExtraManagerConfig(mgrConfigFuncs ...func(ctx context.Context, mgr manager.Manager) error) func(*setup) {
+func WithExtraManagerConfig(mgrConfigFuncs ...func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error) func(*setup) {
 	return func(s *setup) {
 		s.extraManagerConfig = mgrConfigFuncs
 	}
@@ -108,7 +111,7 @@ type setup struct {
 	restConfig             *rest.Config
 	ctrlMgrOptions         *ctrl.Options
 	// extra controller manager config, like adding registering additional controllers
-	extraManagerConfig []func(ctx context.Context, mgr manager.Manager) error
+	extraManagerConfig []func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error
 }
 
 var _ Server = &setup{}
@@ -182,8 +185,34 @@ func (s *setup) Start(ctx context.Context) error {
 		GlobalSettings: globalSettings,
 	}
 
+	istioClient, err := CreateKubeClient(restConfig)
+	if err != nil {
+		return err
+	}
+
+	cli, err := versioned.NewForConfig(restConfig)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("creating krt collections")
+	krtOpts := krtutil.NewKrtOptions(ctx.Done(), setupOpts.KrtDebugger)
+
+	commoncol, err := collections.NewCommonCollections(
+		ctx,
+		krtOpts,
+		istioClient,
+		cli,
+		mgr.GetClient(),
+		s.gatewayControllerName,
+		*globalSettings,
+	)
+	if err != nil {
+		return err
+	}
+
 	for _, mgrCfgFunc := range s.extraManagerConfig {
-		err := mgrCfgFunc(ctx, mgr)
+		err := mgrCfgFunc(ctx, mgr, commoncol.DiscoveryNamespacesFilter)
 		if err != nil {
 			return err
 		}
@@ -191,7 +220,7 @@ func (s *setup) Start(ctx context.Context) error {
 
 	BuildKgatewayWithConfig(
 		ctx, mgr, s.gatewayControllerName, s.gatewayClassName, s.waypointClassName,
-		s.agentGatewayClassName, setupOpts, restConfig, uccBuilder, s.extraPlugins, s.extraGatewayParameters)
+		s.agentGatewayClassName, setupOpts, restConfig, istioClient, commoncol, uccBuilder, s.extraPlugins, s.extraGatewayParameters)
 
 	slog.Info("starting admin server")
 	go admin.RunAdminServer(ctx, setupOpts)
@@ -217,15 +246,12 @@ func BuildKgatewayWithConfig(
 	agentGatewayClassName string,
 	setupOpts *controller.SetupOpts,
 	restConfig *rest.Config,
+	kubeClient istiokube.Client,
+	commonCollections *collections.CommonCollections,
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 ) error {
-	kubeClient, err := CreateKubeClient(restConfig)
-	if err != nil {
-		return err
-	}
-
 	slog.Info("creating krt collections")
 	krtOpts := krtutil.NewKrtOptions(ctx.Done(), setupOpts.KrtDebugger)
 
@@ -253,6 +279,7 @@ func BuildKgatewayWithConfig(
 		UniqueClients:            ucc,
 		Dev:                      logging.MustGetLevel(logging.DefaultComponent) <= logging.LevelTrace,
 		KrtOptions:               krtOpts,
+		CommonCollections:        commonCollections,
 	})
 	if err != nil {
 		slog.Error("failed initializing controller: ", "error", err)

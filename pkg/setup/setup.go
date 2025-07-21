@@ -4,6 +4,7 @@ import (
 	"context"
 
 	xdsserver "github.com/envoyproxy/go-control-plane/pkg/server/v3"
+	"istio.io/istio/pkg/kube/kubetypes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -27,7 +28,7 @@ type Options struct {
 	RestConfig               *rest.Config
 	CtrlMgrOptions           *ctrl.Options
 	// extra controller manager config, like adding registering additional controllers
-	ExtraManagerConfig []func(ctx context.Context, mgr manager.Manager) error
+	ExtraManagerConfig []func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error
 }
 
 func New(opts Options) core.Server {

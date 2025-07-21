@@ -27,10 +27,10 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/proxy_syncer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 	kgtwschemes "github.com/kgateway-dev/kgateway/v2/pkg/schemes"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
@@ -75,8 +75,9 @@ type StartConfig struct {
 	ExtraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	Client                 istiokube.Client
 
-	AugmentedPods krt.Collection[krtcollections.LocalityPod]
-	UniqueClients krt.Collection[ir.UniqlyConnectedClient]
+	CommonCollections *collections.CommonCollections
+	AugmentedPods     krt.Collection[krtcollections.LocalityPod]
+	UniqueClients     krt.Collection[ir.UniqlyConnectedClient]
 
 	KrtOptions krtutil.KrtOptions
 }
@@ -138,27 +139,9 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 		}
 	}
 
-	cli, err := versioned.NewForConfig(cfg.RestConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	globalSettings := *cfg.SetupOpts.GlobalSettings
-	commoncol, err := common.NewCommonCollections(
-		ctx,
-		cfg.KrtOptions,
-		cfg.Client,
-		cli,
-		cfg.Manager.GetClient(),
-		cfg.ControllerName,
-		setupLog,
-		globalSettings,
-	)
-	if err != nil {
-		return nil, err
-	}
-	mergedPlugins := pluginFactoryWithBuiltin(cfg)(ctx, commoncol)
-	commoncol.InitPlugins(ctx, mergedPlugins, globalSettings)
+	mergedPlugins := pluginFactoryWithBuiltin(cfg)(ctx, cfg.CommonCollections)
+	cfg.CommonCollections.InitPlugins(ctx, mergedPlugins, globalSettings)
 
 	// Create the proxy syncer for the Gateway API resources
 	setupLog.Info("initializing proxy syncer")
@@ -169,7 +152,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 		cfg.Client,
 		cfg.UniqueClients,
 		mergedPlugins,
-		commoncol,
+		cfg.CommonCollections,
 		cfg.SetupOpts.Cache,
 		cfg.AgentGatewayClassName,
 	)
@@ -182,7 +165,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.AgentGatewayClassName,
 			cfg.Manager,
 			cfg.Client,
-			commoncol,
+			cfg.CommonCollections,
 			cfg.SetupOpts.Cache,
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)
@@ -203,7 +186,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 		proxySyncer: proxySyncer,
 		cfg:         cfg,
 		mgr:         cfg.Manager,
-		commoncol:   commoncol,
+		commoncol:   cfg.CommonCollections,
 	}
 
 	// wait for the ControllerBuilder to Start
