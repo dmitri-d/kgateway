@@ -14,7 +14,6 @@ import (
 
 	envoylistenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoyroutev3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
-	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
@@ -536,7 +535,6 @@ func (tc TestCase) Run(
 		ourCli,
 		nil,
 		wellknown.DefaultGatewayControllerName,
-		logr.Discard(),
 		*settings,
 	)
 	if err != nil {

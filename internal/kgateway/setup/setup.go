@@ -173,6 +173,11 @@ func (s *setup) Start(ctx context.Context) error {
 		return err
 	}
 
+	if err := controller.AddToScheme(mgr.GetScheme()); err != nil {
+		slog.Error("unable to extend scheme")
+		return err
+	}
+
 	uniqueClientCallbacks, uccBuilder := krtcollections.NewUniquelyConnectedClients(s.extraXDSCallbacks)
 	cache, err := startControlPlane(ctx, globalSettings.XdsServicePort, uniqueClientCallbacks)
 	if err != nil {
@@ -208,6 +213,7 @@ func (s *setup) Start(ctx context.Context) error {
 		*globalSettings,
 	)
 	if err != nil {
+		slog.Error("error creating common collections")
 		return err
 	}
 

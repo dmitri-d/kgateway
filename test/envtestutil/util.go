@@ -35,8 +35,11 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/setup"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 )
 
@@ -79,8 +82,15 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 
 	client, err := istiokube.NewCLIClient(istiokube.NewClientConfigForRestConfig(cfg))
 	if err != nil {
-		t.Fatalf("failed to get init kube client: %v", err)
+		t.Fatalf("failed to init kube client: %v", err)
 	}
+	istiokube.EnableCrdWatcher(client)
+
+	ourCli, err := versioned.NewForConfig(cfg)
+	if err != nil {
+		t.Fatalf("failed to create the clientset: %v", err)
+	}
+
 	var extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []pluginsdk.Plugin
 	if postStart != nil {
 		extraPlugins = postStart(t, ctx, client)
@@ -111,6 +121,10 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 	snapCache, grpcServer := setup.NewControlPlaneWithListener(ctx, lis, uniqueClientCallbacks)
 	t.Cleanup(func() { grpcServer.Stop() })
 
+	krtOpts := krtutil.KrtOptions{
+		Stop: ctx.Done(),
+	}
+
 	setupOpts := &controller.SetupOpts{
 		Cache:          snapCache,
 		KrtDebugger:    new(krt.DebugHandler),
@@ -140,9 +154,27 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 			log.Fatalf("failed to create a manager %v", err)
 		}
 
+		err = controller.AddToScheme(mgr.GetScheme())
+		if err != nil {
+			log.Fatalf("failed update scheme %v", err)
+		}
+
+		commoncol, err := collections.NewCommonCollections(
+			ctx,
+			krtOpts,
+			client,
+			ourCli,
+			mgr.GetClient(),
+			wellknown.DefaultGatewayControllerName,
+			*globalSettings,
+		)
+		if err != nil {
+			log.Fatalf("error creating common collections %v", err)
+		}
+
 		setup.BuildKgatewayWithConfig(ctx, mgr,
 			wellknown.DefaultGatewayControllerName, wellknown.DefaultGatewayClassName, wellknown.DefaultWaypointClassName,
-			wellknown.DefaultAgentGatewayClassName, setupOpts, cfg, builder, extraPlugins, extraGatewayParameters)
+			wellknown.DefaultAgentGatewayClassName, setupOpts, cfg, client, commoncol, builder, extraPlugins, extraGatewayParameters)
 
 		mgr.Start(ctx)
 	}()

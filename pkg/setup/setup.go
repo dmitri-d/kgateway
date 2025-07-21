@@ -27,7 +27,7 @@ type Options struct {
 	ExtraXDSCallbacks        xdsserver.Callbacks
 	RestConfig               *rest.Config
 	CtrlMgrOptions           *ctrl.Options
-	// extra controller manager config, like adding registering additional controllers
+	// extra controller manager config, like registering additional controllers
 	ExtraManagerConfig []func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error
 }
 

@@ -105,11 +105,6 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	}
 	istiolog.Configure(loggingOptions)
 
-	err := AddToScheme(cfg.Manager.GetScheme())
-	if err != nil {
-		return nil, err
-	}
-
 	setupLog.Info("initializing kgateway extensions")
 	// Extend the scheme and add the EPP plugin if the inference extension is enabled and the InferencePool CRD exists.
 	if cfg.SetupOpts.GlobalSettings.EnableInferExt {
