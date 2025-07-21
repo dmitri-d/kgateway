@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -136,7 +137,7 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 			},
 		})
 		if err != nil {
-			panic("failed to create a manager")
+			log.Fatalf("failed to create a manager %v", err)
 		}
 
 		setup.BuildKgatewayWithConfig(ctx, mgr,

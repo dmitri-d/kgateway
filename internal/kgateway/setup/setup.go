@@ -128,6 +128,8 @@ func New(opts ...func(*setup)) *setup {
 
 func (s *setup) Start(ctx context.Context) error {
 	// load global settings
+	slog.Info("starting kgateway")
+
 	globalSettings, err := settings.BuildSettings()
 	if err != nil {
 		slog.Error("error loading settings from env", "error", err)
@@ -219,8 +221,6 @@ func BuildKgatewayWithConfig(
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 ) error {
-	slog.Info("creating kgateway")
-
 	kubeClient, err := CreateKubeClient(restConfig)
 	if err != nil {
 		return err

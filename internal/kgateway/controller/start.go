@@ -108,11 +108,6 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	if err != nil {
 		return nil, err
 	}
-	// TODO (dmitri-d) gateway v1a2 scheme is installed unconditionally in DefaultScheme()/AddToScheme call above, this is redundant
-	// Extend the scheme if the TCPRoute CRD exists.
-	if err := kgtwschemes.AddGatewayV1A2Scheme(cfg.RestConfig, cfg.Manager.GetScheme()); err != nil {
-		return nil, err
-	}
 
 	setupLog.Info("initializing kgateway extensions")
 	// Extend the scheme and add the EPP plugin if the inference extension is enabled and the InferencePool CRD exists.
