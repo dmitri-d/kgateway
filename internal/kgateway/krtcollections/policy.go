@@ -60,7 +60,7 @@ type BackendIndex struct {
 
 	// availableBackendsWithPolicy is built from availableBackends, attaching policy to the given backends.
 	// BackendsWithPolicy is the public interface to access this.
-	availableBackendsWithPolicy []krt.Collection[ir.BackendObjectIR]
+	availableBackendsWithPolicy []krt.Collection[*ir.BackendObjectIR]
 
 	gkAliases map[schema.GroupKind][]schema.GroupKind
 
@@ -104,7 +104,7 @@ func (i *BackendIndex) HasSynced() bool {
 	return true
 }
 
-func (i *BackendIndex) BackendsWithPolicy() []krt.Collection[ir.BackendObjectIR] {
+func (i *BackendIndex) BackendsWithPolicy() []krt.Collection[*ir.BackendObjectIR] {
 	return i.availableBackendsWithPolicy
 }
 
@@ -114,7 +114,7 @@ func (i *BackendIndex) BackendsWithPolicy() []krt.Collection[ir.BackendObjectIR]
 // provied gk. I.e. for the provided gk, it will carry the collection of backends derived from it, with all
 // policies attached.
 func (i *BackendIndex) AddBackends(gk schema.GroupKind, col krt.Collection[ir.BackendObjectIR], aliasKinds ...schema.GroupKind) {
-	backendsWithPoliciesCol := krt.NewCollection(col, func(kctx krt.HandlerContext, backendObj ir.BackendObjectIR) *ir.BackendObjectIR {
+	backendsWithPoliciesCol := krt.NewCollection(col, func(kctx krt.HandlerContext, backendObj ir.BackendObjectIR) **ir.BackendObjectIR {
 		policies := i.policies.getTargetingPoliciesForBackends(kctx, extensionsplug.BackendAttachmentPoint, backendObj.ObjectSource, "", backendObj.GetObjectLabels(), false)
 		for _, aliasObjSrc := range backendObj.Aliases {
 			if aliasObjSrc.Namespace == "" {
@@ -126,7 +126,7 @@ func (i *BackendIndex) AddBackends(gk schema.GroupKind, col krt.Collection[ir.Ba
 			policies = append(policies, aliasPolicies...)
 		}
 		backendObj.AttachedPolicies = toAttachedPolicies(policies)
-		return &backendObj
+		return ptr.Of(&backendObj)
 	}, i.krtopts.ToOptions("")...)
 
 	idx := krt.NewIndex(col, func(backendObj ir.BackendObjectIR) (aliasKeys []backendKey) {
