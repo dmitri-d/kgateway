@@ -21,9 +21,7 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/admin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/controller"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
@@ -267,17 +265,6 @@ func (s *setup) Start(ctx context.Context) error {
 
 	slog.Info("starting manager")
 	return mgr.Start(ctx)
-}
-
-func (s *setup) pluginFactoryWithBuiltin() extensions2.K8sGatewayExtensionsFactory {
-	return func(ctx context.Context, commoncol *common.CommonCollections) sdk.Plugin {
-		plugins := registry.Plugins(ctx, commoncol, s.waypointClassName)
-		plugins = append(plugins, krtcollections.NewBuiltinPlugin(ctx))
-		if s.extraPlugins != nil {
-			plugins = append(plugins, s.extraPlugins(ctx, commoncol)...)
-		}
-		return registry.MergePlugins(plugins...)
-	}
 }
 
 func startControlPlane(
