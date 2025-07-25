@@ -203,7 +203,6 @@ func (s *setup) Start(ctx context.Context) error {
 
 	mgr, err := ctrl.NewManager(s.restConfig, *mgrOpts)
 	if err != nil {
-		slog.Error("unable to start controller manager")
 		return err
 	}
 
