@@ -34,10 +34,6 @@ func translateLoadBalancerConfig(config *v1alpha1.LoadBalancer) *LoadBalancerCon
 
 	out.commonLbConfig = &envoyclusterv3.Cluster_CommonLbConfig{}
 
-	out.commonLbConfig.ConsistentHashingLbConfig = &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{
-		UseHostnameForHashing: config.UseHostnameForHashing,
-	}
-
 	if config.HealthyPanicThreshold != nil {
 		out.commonLbConfig.HealthyPanicThreshold = &typev3.Percent{
 			Value: float64(*config.HealthyPanicThreshold),
@@ -84,8 +80,18 @@ func translateLoadBalancerConfig(config *v1alpha1.LoadBalancer) *LoadBalancerCon
 				Value: *config.RingHash.MaximumRingSize,
 			}
 		}
+		if config.RingHash.UseHostnameForHashing != nil {
+			out.commonLbConfig.ConsistentHashingLbConfig = &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{
+				UseHostnameForHashing: *config.RingHash.UseHostnameForHashing,
+			}
+		}
 	} else if config.Maglev != nil {
 		out.lbPolicy = envoyclusterv3.Cluster_MAGLEV
+		if config.Maglev.UseHostnameForHashing != nil {
+			out.commonLbConfig.ConsistentHashingLbConfig = &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{
+				UseHostnameForHashing: *config.Maglev.UseHostnameForHashing,
+			}
+		}
 	} else if config.Random != nil {
 		out.lbPolicy = envoyclusterv3.Cluster_RANDOM
 	}
@@ -96,6 +102,14 @@ func translateLoadBalancerConfig(config *v1alpha1.LoadBalancer) *LoadBalancerCon
 func applyLoadBalancerConfig(config *LoadBalancerConfigIR, out *envoyclusterv3.Cluster) {
 	if config == nil {
 		return
+	}
+
+	if config.commonLbConfig != nil && config.commonLbConfig.ConsistentHashingLbConfig != nil &&
+		config.commonLbConfig.ConsistentHashingLbConfig.UseHostnameForHashing {
+		if out.GetType() != envoyclusterv3.Cluster_STRICT_DNS {
+			logger.Error("useHostnameForHashing is only supported for STRICT_DNS clusters. Ignoring useHostnameForHashing.", "cluster", out.GetName())
+			config.commonLbConfig.ConsistentHashingLbConfig = nil
+		}
 	}
 
 	out.CommonLbConfig = config.commonLbConfig

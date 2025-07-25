@@ -21,6 +21,7 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 	tests := []struct {
 		name     string
 		config   *v1alpha1.LoadBalancer
+		cluster  *envoyclusterv3.Cluster
 		expected *envoyclusterv3.Cluster
 	}{
 		{
@@ -34,7 +35,6 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 					HealthyPanicThreshold: &typev3.Percent{
 						Value: 100,
 					},
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
 				},
 			},
 		},
@@ -48,8 +48,7 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 			expected: &envoyclusterv3.Cluster{
 				Name: "test",
 				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					UpdateMergeWindow:         durationpb.New(10 * time.Second),
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
+					UpdateMergeWindow: durationpb.New(10 * time.Second),
 				},
 			},
 		},
@@ -59,11 +58,9 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 				Random: &v1alpha1.LoadBalancerRandomConfig{},
 			},
 			expected: &envoyclusterv3.Cluster{
-				Name:     "test",
-				LbPolicy: envoyclusterv3.Cluster_RANDOM,
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				Name:           "test",
+				LbPolicy:       envoyclusterv3.Cluster_RANDOM,
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -72,11 +69,9 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 				RoundRobin: &v1alpha1.LoadBalancerRoundRobinConfig{},
 			},
 			expected: &envoyclusterv3.Cluster{
-				Name:     "test",
-				LbPolicy: envoyclusterv3.Cluster_ROUND_ROBIN,
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				Name:           "test",
+				LbPolicy:       envoyclusterv3.Cluster_ROUND_ROBIN,
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -109,9 +104,7 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 						},
 					},
 				},
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -127,9 +120,7 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 						ChoiceCount: &wrapperspb.UInt32Value{},
 					},
 				},
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -164,9 +155,7 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 						},
 					},
 				},
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -180,9 +169,7 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 				LbConfig: &envoyclusterv3.Cluster_RingHashLbConfig_{
 					RingHashLbConfig: &envoyclusterv3.Cluster_RingHashLbConfig{},
 				},
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -202,9 +189,7 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 						MaximumRingSize: &wrapperspb.UInt64Value{Value: 100},
 					},
 				},
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -213,11 +198,9 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 				Maglev: &v1alpha1.LoadBalancerMaglevConfig{},
 			},
 			expected: &envoyclusterv3.Cluster{
-				Name:     "test",
-				LbPolicy: envoyclusterv3.Cluster_MAGLEV,
-				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
-				},
+				Name:           "test",
+				LbPolicy:       envoyclusterv3.Cluster_MAGLEV,
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
 			},
 		},
 		{
@@ -231,7 +214,6 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 					LocalityConfigSpecifier: &envoyclusterv3.Cluster_CommonLbConfig_LocalityWeightedLbConfig_{
 						LocalityWeightedLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_LocalityWeightedLbConfig{},
 					},
-					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
 				},
 			},
 		},
@@ -244,17 +226,30 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 				Name: "test",
 				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
 					CloseConnectionsOnHostSetChange: true,
-					ConsistentHashingLbConfig:       &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{},
 				},
 			},
 		},
 		{
-			name: "UseHostnameForHashing",
+			name: "UseHostnameForHashing, STRICT_DNS",
 			config: &v1alpha1.LoadBalancer{
-				UseHostnameForHashing: true,
+				RingHash: &v1alpha1.LoadBalancerRingHashConfig{
+					UseHostnameForHashing: ptr.To(true),
+				},
+			},
+			cluster: &envoyclusterv3.Cluster{
+				ClusterDiscoveryType: &envoyclusterv3.Cluster_Type{
+					Type: envoyclusterv3.Cluster_STRICT_DNS,
+				},
 			},
 			expected: &envoyclusterv3.Cluster{
 				Name: "test",
+				ClusterDiscoveryType: &envoyclusterv3.Cluster_Type{
+					Type: envoyclusterv3.Cluster_STRICT_DNS,
+				},
+				LbPolicy: envoyclusterv3.Cluster_RING_HASH,
+				LbConfig: &envoyclusterv3.Cluster_RingHashLbConfig_{
+					RingHashLbConfig: &envoyclusterv3.Cluster_RingHashLbConfig{},
+				},
 				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{
 					ConsistentHashingLbConfig: &envoyclusterv3.Cluster_CommonLbConfig_ConsistentHashingLbConfig{
 						UseHostnameForHashing: true,
@@ -262,11 +257,38 @@ func TestApplyLoadBalancerConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "UseHostnameForHashing, EDS",
+			config: &v1alpha1.LoadBalancer{
+				RingHash: &v1alpha1.LoadBalancerRingHashConfig{
+					UseHostnameForHashing: ptr.To(true),
+				},
+			},
+			cluster: &envoyclusterv3.Cluster{
+				ClusterDiscoveryType: &envoyclusterv3.Cluster_Type{
+					Type: envoyclusterv3.Cluster_EDS,
+				},
+			},
+			expected: &envoyclusterv3.Cluster{
+				Name: "test",
+				ClusterDiscoveryType: &envoyclusterv3.Cluster_Type{
+					Type: envoyclusterv3.Cluster_EDS,
+				},
+				LbPolicy: envoyclusterv3.Cluster_RING_HASH,
+				LbConfig: &envoyclusterv3.Cluster_RingHashLbConfig_{
+					RingHashLbConfig: &envoyclusterv3.Cluster_RingHashLbConfig{},
+				},
+				CommonLbConfig: &envoyclusterv3.Cluster_CommonLbConfig{},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cluster := &envoyclusterv3.Cluster{}
+			cluster := test.cluster
+			if cluster == nil {
+				cluster = &envoyclusterv3.Cluster{}
+			}
 			cluster.Name = "test"
 			lbConfig := translateLoadBalancerConfig(test.config)
 			applyLoadBalancerConfig(lbConfig, cluster)
