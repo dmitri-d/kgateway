@@ -31,7 +31,7 @@ type Options struct {
 	ExtraManagerConfig []func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error
 }
 
-func New(opts Options) core.Server {
+func New(opts Options) (core.Server, error) {
 	// internal setup already accepted functional-options; we wrap only extras.
 	return core.New(
 		core.WithExtraPlugins(opts.ExtraPlugins),

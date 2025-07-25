@@ -106,7 +106,7 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 		t.Fatalf("can't listen %v", err)
 	}
 
-	s := setup.New(
+	s, err := setup.New(
 		setup.WithGlobalSettings(globalSettings),
 		setup.WithRestConfig(cfg),
 		setup.WithExtraPlugins(extraPlugins),
@@ -134,6 +134,9 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 			},
 		}...),
 	)
+	if err != nil {
+		t.Fatalf("error setting up kgateway %v", err)
+	}
 
 	// start kgateway
 	wg.Add(1)

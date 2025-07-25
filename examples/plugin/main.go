@@ -249,7 +249,7 @@ func main() {
 	// This binary is the control plane. normally it would be packaged in a docker image and run
 	// in a k8s cluster.
 
-	setup := setup.New(
+	setup, _ := setup.New(
 		setup.WithExtraPlugins(pluginFactory),
 		setup.ExtraGatewayParameters(extraGatewayParametersFactory),
 	)

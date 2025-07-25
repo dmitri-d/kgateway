@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net"
 
-	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	xdsserver "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/go-logr/logr"
 	istiokube "istio.io/istio/pkg/kube"
@@ -83,7 +82,7 @@ func WithRestConfig(rc *rest.Config) func(*setup) {
 
 func WithControllerManagerOptions(opts *ctrl.Options) func(*setup) {
 	return func(s *setup) {
-		s.ctrlMgrOptions = opts
+		s.ctrlMgrOptionsInitFunc = func(context.Context) *ctrl.Options { return opts }
 	}
 }
 
@@ -128,7 +127,7 @@ type setup struct {
 	extraXDSCallbacks      xdsserver.Callbacks
 	xdsListener            net.Listener
 	restConfig             *rest.Config
-	ctrlMgrOptions         *ctrl.Options
+	ctrlMgrOptionsInitFunc func(context.Context) *ctrl.Options
 	// extra controller manager config, like adding registering additional controllers
 	extraManagerConfig []func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error
 	krtDebugger        *krt.DebugHandler
@@ -137,7 +136,7 @@ type setup struct {
 
 var _ Server = &setup{}
 
-func New(opts ...func(*setup)) *setup {
+func New(opts ...func(*setup)) (*setup, error) {
 	s := &setup{
 		gatewayControllerName: wellknown.DefaultGatewayControllerName,
 		gatewayClassName:      wellknown.DefaultGatewayClassName,
@@ -147,85 +146,89 @@ func New(opts ...func(*setup)) *setup {
 	for _, opt := range opts {
 		opt(s)
 	}
-	return s
-}
 
-func (s *setup) Start(ctx context.Context) error {
-	// load global settings
-	slog.Info("starting kgateway")
-
-	globalSettings := s.globalSettings
-	if globalSettings == nil {
+	if s.globalSettings == nil {
 		var err error
-		globalSettings, err = settings.BuildSettings()
+		s.globalSettings, err = settings.BuildSettings()
 		if err != nil {
 			slog.Error("error loading settings from env", "error", err)
 		}
+
+		return nil, err
 	}
 
-	setupLogging(globalSettings.LogLevel)
-	slog.Info("global settings loaded", "settings", *globalSettings)
-
-	var restConfig *rest.Config
-	if s.restConfig != nil {
-		restConfig = s.restConfig
-	} else {
-		restConfig = ctrl.GetConfigOrDie()
+	if s.restConfig == nil {
+		s.restConfig = ctrl.GetConfigOrDie()
 	}
 
-	var mgrOpts *ctrl.Options
-	if s.ctrlMgrOptions != nil {
-		mgrOpts = s.ctrlMgrOptions
-	} else {
-		mgrOpts = &ctrl.Options{
-			BaseContext:      func() context.Context { return ctx },
-			Scheme:           runtime.NewScheme(),
-			PprofBindAddress: "127.0.0.1:9099",
-			// if you change the port here, also change the port "health" in the helmchart.
-			HealthProbeBindAddress: ":9093",
-			Metrics: metricsserver.Options{
-				BindAddress: ":9092",
-			},
+	if s.ctrlMgrOptionsInitFunc == nil {
+		s.ctrlMgrOptionsInitFunc = func(ctx context.Context) *ctrl.Options {
+			return &ctrl.Options{
+				BaseContext:      func() context.Context { return ctx },
+				Scheme:           runtime.NewScheme(),
+				PprofBindAddress: "127.0.0.1:9099",
+				// if you change the port here, also change the port "health" in the helmchart.
+				HealthProbeBindAddress: ":9093",
+				Metrics: metricsserver.Options{
+					BindAddress: ":9092",
+				},
+			}
 		}
 	}
 
-	metrics.SetRegistry(globalSettings.EnableBuiltinDefaultMetrics, nil)
+	if s.krtDebugger == nil {
+		s.krtDebugger = new(krt.DebugHandler)
+	}
+
+	if s.xdsListener == nil {
+		var err error
+		s.xdsListener, err = newXDSListener(s.globalSettings.XdsServiceBindAddress, s.globalSettings.XdsServicePort)
+		if err != nil {
+			slog.Error("error creating xds listener", "error", err)
+		}
+
+		return nil, err
+	}
+
+	return s, nil
+}
+
+func (s *setup) Start(ctx context.Context) error {
+	slog.Info("starting kgateway")
+
+	setupLogging(s.globalSettings.LogLevel)
+
+	mgrOpts := s.ctrlMgrOptionsInitFunc(ctx)
+
+	metrics.SetRegistry(s.globalSettings.EnableBuiltinDefaultMetrics, nil)
 	metrics.SetActive(!(mgrOpts.Metrics.BindAddress == "" || mgrOpts.Metrics.BindAddress == "0"))
 
-	mgr, err := ctrl.NewManager(restConfig, *mgrOpts)
+	mgr, err := ctrl.NewManager(s.restConfig, *mgrOpts)
 	if err != nil {
 		slog.Error("unable to start controller manager")
 		return err
 	}
 
 	if err := controller.AddToScheme(mgr.GetScheme()); err != nil {
-		slog.Error("unable to extend scheme")
+		slog.Error("unable to extend scheme", "error", err)
 		return err
 	}
 
 	uniqueClientCallbacks, uccBuilder := krtcollections.NewUniquelyConnectedClients(s.extraXDSCallbacks)
-	cache, err := startControlPlane(
-		ctx, s.xdsListener, globalSettings.XdsServiceBindAddress, globalSettings.XdsServicePort, uniqueClientCallbacks)
-	if err != nil {
-		return err
-	}
-	krtDbg := s.krtDebugger
-	if krtDbg == nil {
-		krtDbg = new(krt.DebugHandler)
-	}
+	cache := NewControlPlane(ctx, s.xdsListener, uniqueClientCallbacks)
 
 	setupOpts := &controller.SetupOpts{
 		Cache:          cache,
-		KrtDebugger:    krtDbg,
-		GlobalSettings: globalSettings,
+		KrtDebugger:    s.krtDebugger,
+		GlobalSettings: s.globalSettings,
 	}
 
-	istioClient, err := CreateKubeClient(restConfig)
+	istioClient, err := CreateKubeClient(s.restConfig)
 	if err != nil {
 		return err
 	}
 
-	cli, err := versioned.NewForConfig(restConfig)
+	cli, err := versioned.NewForConfig(s.restConfig)
 	if err != nil {
 		return err
 	}
@@ -240,14 +243,12 @@ func (s *setup) Start(ctx context.Context) error {
 		cli,
 		mgr.GetClient(),
 		s.gatewayControllerName,
-		*globalSettings,
+		*s.globalSettings,
 	)
 	if err != nil {
-		slog.Error("error creating common collections")
+		slog.Error("error creating common collections", "error", err)
 		return err
 	}
-	// mergedPlugins := s.pluginFactoryWithBuiltin()(ctx, commoncol)
-	// commoncol.InitPlugins(ctx, mergedPlugins, *globalSettings)
 
 	for _, mgrCfgFunc := range s.extraManagerConfig {
 		err := mgrCfgFunc(ctx, mgr, commoncol.DiscoveryNamespacesFilter)
@@ -258,7 +259,7 @@ func (s *setup) Start(ctx context.Context) error {
 
 	BuildKgatewayWithConfig(
 		ctx, mgr, s.gatewayControllerName, s.gatewayClassName, s.waypointClassName,
-		s.agentGatewayClassName, setupOpts, restConfig, istioClient, commoncol, uccBuilder, s.extraPlugins, s.extraGatewayParameters)
+		s.agentGatewayClassName, setupOpts, s.restConfig, istioClient, commoncol, uccBuilder, s.extraPlugins, s.extraGatewayParameters)
 
 	slog.Info("starting admin server")
 	go admin.RunAdminServer(ctx, setupOpts)
@@ -267,15 +268,9 @@ func (s *setup) Start(ctx context.Context) error {
 	return mgr.Start(ctx)
 }
 
-func startControlPlane(
-	ctx context.Context,
-	l net.Listener,
-	ip string,
-	port uint32,
-	callbacks xdsserver.Callbacks,
-) (envoycache.SnapshotCache, error) {
-	addr := net.ParseIP(ip)
-	return NewControlPlane(ctx, l, &net.TCPAddr{IP: addr, Port: int(port)}, callbacks)
+func newXDSListener(ip string, port uint32) (net.Listener, error) {
+	bindAddr := net.TCPAddr{IP: net.ParseIP(ip), Port: int(port)}
+	return net.Listen(bindAddr.Network(), bindAddr.String())
 }
 
 func BuildKgatewayWithConfig(
