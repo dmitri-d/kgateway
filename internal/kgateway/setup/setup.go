@@ -181,7 +181,7 @@ func New(opts ...func(*setup)) (*setup, error) {
 
 	if s.xdsListener == nil {
 		var err error
-		s.xdsListener, err = newXDSListener(s.globalSettings.XdsServiceBindAddress, s.globalSettings.XdsServicePort)
+		s.xdsListener, err = newXDSListener("0.0.0.0", s.globalSettings.XdsServicePort)
 		if err != nil {
 			slog.Error("error creating xds listener", "error", err)
 			return nil, err
