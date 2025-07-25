@@ -81,6 +81,11 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 	}
 	istiokube.EnableCrdWatcher(client)
 
+	var extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []pluginsdk.Plugin
+	if postStart != nil {
+		extraPlugins = postStart(t, ctx, client)
+	}
+
 	for _, yamlFileWithNs := range yamlFilesToApply {
 		ns := yamlFileWithNs[0]
 		yamlFile := yamlFileWithNs[1]
@@ -92,11 +97,6 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 		if err != nil {
 			t.Fatalf("failed to apply pod status: %v", err)
 		}
-	}
-
-	var extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []pluginsdk.Plugin
-	if postStart != nil {
-		extraPlugins = postStart(t, ctx, client)
 	}
 
 	krtDbg := new(krt.DebugHandler)
