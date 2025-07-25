@@ -283,7 +283,7 @@ func (c *ControllerBuilder) Build(ctx context.Context) error {
 		}
 	}
 
-	// TODO (dmitri-d) don't think this is used anywhere
+	// TODO (dmitri-d) don't think c.ready field is used anywhere and can be removed
 	// mgr WaitForCacheSync is part of proxySyncer's HasSynced
 	// so we can mark ready here before we call mgr.Start
 	c.ready.Store(true)
