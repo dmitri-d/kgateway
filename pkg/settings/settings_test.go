@@ -27,7 +27,6 @@ func allEnvVarsSet() map[string]string {
 		"KGW_XDS_SERVICE_HOST":               "my-xds-host",
 		"KGW_XDS_SERVICE_NAME":               "custom-svc",
 		"KGW_XDS_SERVICE_PORT":               "1234",
-		"KGW_XDS_SERVICE_BIND_ADDRESS":       "127.0.0.1",
 		"KGW_USE_RUST_FORMATIONS":            "true",
 		"KGW_ENABLE_INFER_EXT":               "true",
 		"KGW_INFER_EXT_AUTO_PROVISION":       "true",
