@@ -101,6 +101,9 @@ type Settings struct {
 	// Ignored if XdsServiceHost is set.
 	XdsServiceName string `split_words:"true" default:"kgateway"`
 
+	// XdsServiceBindAddress ip address xds service listens on.
+	XdsServiceBindAddress string `split_words:"true" default:"0.0.0.0"`
+
 	// XdsServicePort is the port of the Kubernetes Service that serves xDS config.
 	// This corresponds to the value of the `grpc-xds` port in the service.
 	XdsServicePort uint32 `split_words:"true" default:"9977"`

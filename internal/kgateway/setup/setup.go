@@ -21,7 +21,9 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/admin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/controller"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
@@ -93,9 +95,28 @@ func WithExtraXDSCallbacks(extraXDSCallbacks xdsserver.Callbacks) func(*setup) {
 	}
 }
 
+// used for tests only to get access to dynamically assigned port number
+func WithXDSListener(l net.Listener) func(*setup) {
+	return func(s *setup) {
+		s.xdsListener = l
+	}
+}
+
 func WithExtraManagerConfig(mgrConfigFuncs ...func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error) func(*setup) {
 	return func(s *setup) {
 		s.extraManagerConfig = mgrConfigFuncs
+	}
+}
+
+func WithKrtDebugger(dbg *krt.DebugHandler) func(*setup) {
+	return func(s *setup) {
+		s.krtDebugger = dbg
+	}
+}
+
+func WithGlobalSettings(settings *settings.Settings) func(*setup) {
+	return func(s *setup) {
+		s.globalSettings = settings
 	}
 }
 
@@ -107,10 +128,13 @@ type setup struct {
 	extraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	extraXDSCallbacks      xdsserver.Callbacks
+	xdsListener            net.Listener
 	restConfig             *rest.Config
 	ctrlMgrOptions         *ctrl.Options
 	// extra controller manager config, like adding registering additional controllers
 	extraManagerConfig []func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error
+	krtDebugger        *krt.DebugHandler
+	globalSettings     *settings.Settings
 }
 
 var _ Server = &setup{}
@@ -132,9 +156,13 @@ func (s *setup) Start(ctx context.Context) error {
 	// load global settings
 	slog.Info("starting kgateway")
 
-	globalSettings, err := settings.BuildSettings()
-	if err != nil {
-		slog.Error("error loading settings from env", "error", err)
+	globalSettings := s.globalSettings
+	if globalSettings == nil {
+		var err error
+		globalSettings, err = settings.BuildSettings()
+		if err != nil {
+			slog.Error("error loading settings from env", "error", err)
+		}
 	}
 
 	setupLogging(globalSettings.LogLevel)
@@ -178,14 +206,19 @@ func (s *setup) Start(ctx context.Context) error {
 	}
 
 	uniqueClientCallbacks, uccBuilder := krtcollections.NewUniquelyConnectedClients(s.extraXDSCallbacks)
-	cache, err := startControlPlane(ctx, globalSettings.XdsServicePort, uniqueClientCallbacks)
+	cache, err := startControlPlane(
+		ctx, s.xdsListener, globalSettings.XdsServiceBindAddress, globalSettings.XdsServicePort, uniqueClientCallbacks)
 	if err != nil {
 		return err
+	}
+	krtDbg := s.krtDebugger
+	if krtDbg == nil {
+		krtDbg = new(krt.DebugHandler)
 	}
 
 	setupOpts := &controller.SetupOpts{
 		Cache:          cache,
-		KrtDebugger:    new(krt.DebugHandler),
+		KrtDebugger:    krtDbg,
 		GlobalSettings: globalSettings,
 	}
 
@@ -215,6 +248,8 @@ func (s *setup) Start(ctx context.Context) error {
 		slog.Error("error creating common collections")
 		return err
 	}
+	// mergedPlugins := s.pluginFactoryWithBuiltin()(ctx, commoncol)
+	// commoncol.InitPlugins(ctx, mergedPlugins, *globalSettings)
 
 	for _, mgrCfgFunc := range s.extraManagerConfig {
 		err := mgrCfgFunc(ctx, mgr, commoncol.DiscoveryNamespacesFilter)
@@ -234,12 +269,26 @@ func (s *setup) Start(ctx context.Context) error {
 	return mgr.Start(ctx)
 }
 
+func (s *setup) pluginFactoryWithBuiltin() extensions2.K8sGatewayExtensionsFactory {
+	return func(ctx context.Context, commoncol *common.CommonCollections) sdk.Plugin {
+		plugins := registry.Plugins(ctx, commoncol, s.waypointClassName)
+		plugins = append(plugins, krtcollections.NewBuiltinPlugin(ctx))
+		if s.extraPlugins != nil {
+			plugins = append(plugins, s.extraPlugins(ctx, commoncol)...)
+		}
+		return registry.MergePlugins(plugins...)
+	}
+}
+
 func startControlPlane(
 	ctx context.Context,
+	l net.Listener,
+	ip string,
 	port uint32,
 	callbacks xdsserver.Callbacks,
 ) (envoycache.SnapshotCache, error) {
-	return NewControlPlane(ctx, &net.TCPAddr{IP: net.IPv4zero, Port: int(port)}, callbacks)
+	addr := net.ParseIP(ip)
+	return NewControlPlane(ctx, l, &net.TCPAddr{IP: addr, Port: int(port)}, callbacks)
 }
 
 func BuildKgatewayWithConfig(

@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	istiokube "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
+	"istio.io/istio/pkg/kube/kubetypes"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,21 +26,15 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/yaml"
 
 	ctrl "sigs.k8s.io/controller-runtime"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/controller"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/setup"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
-	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
-	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
-	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 )
 
@@ -86,17 +81,6 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 	}
 	istiokube.EnableCrdWatcher(client)
 
-	ourCli, err := versioned.NewForConfig(cfg)
-	if err != nil {
-		t.Fatalf("failed to create the clientset: %v", err)
-	}
-
-	var extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []pluginsdk.Plugin
-	if postStart != nil {
-		extraPlugins = postStart(t, ctx, client)
-	}
-	var extraGatewayParameters func(cli ctrlclient.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
-
 	for _, yamlFileWithNs := range yamlFilesToApply {
 		ns := yamlFileWithNs[0]
 		yamlFile := yamlFileWithNs[1]
@@ -110,79 +94,64 @@ func RunController(t *testing.T, logger *zap.Logger, globalSettings *settings.Se
 		}
 	}
 
-	// setup xDS server:
-	uniqueClientCallbacks, builder := krtcollections.NewUniquelyConnectedClients(nil)
+	var extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []pluginsdk.Plugin
+	if postStart != nil {
+		extraPlugins = postStart(t, ctx, client)
+	}
 
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	krtDbg := new(krt.DebugHandler)
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("can't listen %v", err)
 	}
-	xdsPort := lis.Addr().(*net.TCPAddr).Port
-	snapCache, grpcServer := setup.NewControlPlaneWithListener(ctx, lis, uniqueClientCallbacks)
-	t.Cleanup(func() { grpcServer.Stop() })
 
-	krtOpts := krtutil.KrtOptions{
-		Stop: ctx.Done(),
-	}
-
-	setupOpts := &controller.SetupOpts{
-		Cache:          snapCache,
-		KrtDebugger:    new(krt.DebugHandler),
-		GlobalSettings: globalSettings,
-	}
-	t.Log("controller starting. xds port:", xdsPort)
+	s := setup.New(
+		setup.WithGlobalSettings(globalSettings),
+		setup.WithRestConfig(cfg),
+		setup.WithExtraPlugins(extraPlugins),
+		setup.WithKrtDebugger(krtDbg),
+		setup.WithXDSListener(l),
+		setup.WithControllerManagerOptions(
+			&ctrl.Options{
+				BaseContext:      func() context.Context { return ctx },
+				Scheme:           runtime.NewScheme(),
+				PprofBindAddress: "127.0.0.1:9099",
+				// if you change the port here, also change the port "health" in the helmchart.
+				HealthProbeBindAddress: ":9093",
+				Controller: config.Controller{
+					// 	// see https://github.com/kubernetes-sigs/controller-runtime/issues/2937
+					// 	// in short, our tests reuse the same name (reasonably so) and the controller-runtime
+					// 	// package does not reset the stack of controller names between tests, so we disable
+					// 	// the name validation here.
+					SkipNameValidation: ptr.To(true),
+				},
+			},
+		),
+		setup.WithExtraManagerConfig([]func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error{
+			func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error {
+				return controller.AddToScheme(mgr.GetScheme())
+			},
+		}...),
+	)
 
 	// start kgateway
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-			BaseContext:      func() context.Context { return ctx },
-			Scheme:           runtime.NewScheme(),
-			PprofBindAddress: "127.0.0.1:9099",
-			// if you change the port here, also change the port "health" in the helmchart.
-			HealthProbeBindAddress: ":9093",
-			Controller: config.Controller{
-				// see https://github.com/kubernetes-sigs/controller-runtime/issues/2937
-				// in short, our tests reuse the same name (reasonably so) and the controller-runtime
-				// package does not reset the stack of controller names between tests, so we disable
-				// the name validation here.
-				SkipNameValidation: ptr.To(true),
-			},
-		})
-		if err != nil {
-			log.Fatalf("failed to create a manager %v", err)
+		if err := s.Start(ctx); err != nil {
+			log.Fatalf("error starting kgateway %v", err)
 		}
-
-		err = controller.AddToScheme(mgr.GetScheme())
-		if err != nil {
-			log.Fatalf("failed update scheme %v", err)
-		}
-
-		commoncol, err := collections.NewCommonCollections(
-			ctx,
-			krtOpts,
-			client,
-			ourCli,
-			mgr.GetClient(),
-			wellknown.DefaultGatewayControllerName,
-			*globalSettings,
-		)
-		if err != nil {
-			log.Fatalf("error creating common collections %v", err)
-		}
-
-		setup.BuildKgatewayWithConfig(ctx, mgr,
-			wellknown.DefaultGatewayControllerName, wellknown.DefaultGatewayClassName, wellknown.DefaultWaypointClassName,
-			wellknown.DefaultAgentGatewayClassName, setupOpts, cfg, client, commoncol, builder, extraPlugins, extraGatewayParameters)
-
-		mgr.Start(ctx)
 	}()
+
 	// give kgateway time to initialize so we don't get
 	// "kgateway not initialized" error
 	// this means that it attaches the pod collection to the unique client set collection.
 	time.Sleep(time.Second)
-	run(t, ctx, setupOpts.KrtDebugger, client, xdsPort)
+
+	xdsPort := l.Addr().(*net.TCPAddr).Port
+	t.Log("running tests, xds port:", xdsPort)
+	run(t, ctx, krtDbg, client, xdsPort)
 	t.Log("controller done. shutting down. xds port:", xdsPort)
 }
 
