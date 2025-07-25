@@ -152,9 +152,8 @@ func New(opts ...func(*setup)) (*setup, error) {
 		s.globalSettings, err = settings.BuildSettings()
 		if err != nil {
 			slog.Error("error loading settings from env", "error", err)
+			return nil, err
 		}
-
-		return nil, err
 	}
 
 	if s.restConfig == nil {
@@ -185,9 +184,8 @@ func New(opts ...func(*setup)) (*setup, error) {
 		s.xdsListener, err = newXDSListener(s.globalSettings.XdsServiceBindAddress, s.globalSettings.XdsServicePort)
 		if err != nil {
 			slog.Error("error creating xds listener", "error", err)
+			return nil, err
 		}
-
-		return nil, err
 	}
 
 	return s, nil
