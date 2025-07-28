@@ -82,7 +82,9 @@ func WithRestConfig(rc *rest.Config) func(*setup) {
 
 func WithControllerManagerOptions(opts *ctrl.Options) func(*setup) {
 	return func(s *setup) {
-		s.ctrlMgrOptionsInitFunc = func(context.Context) *ctrl.Options { return opts }
+		if opts != nil {
+			s.ctrlMgrOptionsInitFunc = func(context.Context) *ctrl.Options { return opts }
+		}
 	}
 }
 
